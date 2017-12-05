@@ -16,6 +16,7 @@ type transmitter interface {
 
 type httpTransmitter struct {
 	endpoint string
+	client   *http.Client
 }
 
 type transmissionResult struct {
@@ -51,7 +52,16 @@ const (
 )
 
 func newTransmitter(endpointAddress string) transmitter {
-	return &httpTransmitter{endpointAddress}
+	// Make sure that this does not get tracked as a remote dependency
+	// by automatic collection
+	client := &http.Client
+	*client = *http.DefaultClient
+	client.Transport = &http.DefaultTransport
+	
+	return &httpTransmitter{
+		endpoint: endpointAddress,
+		client:   client,
+	}
 }
 
 func (transmitter *httpTransmitter) Transmit(payload []byte, items telemetryBufferItems) (*transmissionResult, error) {
