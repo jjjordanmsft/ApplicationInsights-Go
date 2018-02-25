@@ -14,9 +14,12 @@ const (
 	correlationRetryWait = 10 * time.Second
 )
 
+type cidLookup interface {
+	Query(baseUri, ikey string, callback correlationCallback)
+}
+
 type correlationIdManager struct {
 	lock    sync.Mutex
-	baseUri string
 	pending map[string]*correlationLookup
 	results map[string]*correlationResult
 }
@@ -24,49 +27,49 @@ type correlationIdManager struct {
 type correlationCallback func(*correlationResult)
 
 type correlationLookup struct {
-	ikey      string
+	id        string
+	url       string
 	callbacks []correlationCallback
 }
 
 type correlationResult struct {
-	ikey          string
 	correlationId string
 	err           error
 }
 
 func newCorrelationIdManager() *correlationIdManager {
 	return &correlationIdManager{
-		baseUri: "",
 		pending: make(map[string]*correlationLookup),
 		results: make(map[string]*correlationResult),
 	}
 }
 
-func (manager *correlationIdManager) Query(ikey string, callback correlationCallback) {
+func (manager *correlationIdManager) Query(baseUri, ikey string, callback correlationCallback) {
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
 
-	upperId := strings.ToLower(ikey)
-	if result, ok := manager.results[upperId]; ok {
+	url := fmt.Sprintf("%s/api/profiles/%s/appId", baseUri, ikey)
+	id := strings.ToUpper(url)
+	if result, ok := manager.results[id]; ok {
 		callback(result)
-	} else if pending, ok := manager.pending[upperId]; ok {
+	} else if pending, ok := manager.pending[id]; ok {
 		pending.callbacks = append(pending.callbacks, callback)
 	} else {
 		lookup := &correlationLookup{
-			ikey:      ikey,
+			url:       url,
+			id:        id,
 			callbacks: []correlationCallback{callback},
 		}
 
-		manager.pending[upperId] = lookup
+		manager.pending[id] = lookup
 		go manager.lookup(lookup)
 	}
 }
 
 func (manager *correlationIdManager) lookup(lookup *correlationLookup) {
 	var lastError error
-	url := fmt.Sprintf("%s/api/profiles/%s/appId", manager.baseUri, lookup.ikey)
 	for i := 0; i < correlationMaxRetry; i++ {
-		cid, retry, err := tryLookupCorrelationId(url)
+		cid, retry, err := tryLookupCorrelationId(lookup.url)
 		if err == nil {
 			manager.postResult(lookup, cid, nil)
 			return
@@ -90,14 +93,12 @@ func (manager *correlationIdManager) postResult(lookup *correlationLookup, corre
 	defer manager.lock.Unlock()
 
 	result := &correlationResult{
-		ikey:          lookup.ikey,
 		correlationId: correlationId,
 		err:           err,
 	}
 
-	upperId := strings.ToUpper(lookup.ikey)
-	manager.results[upperId] = result
-	delete(manager.pending, upperId)
+	manager.results[lookup.id] = result
+	delete(manager.pending, lookup.id)
 
 	for _, callback := range lookup.callbacks {
 		callback(result)

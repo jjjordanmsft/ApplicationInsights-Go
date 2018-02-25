@@ -21,6 +21,10 @@ type TelemetryConfiguration struct {
 
 	// Maximum time to wait before sending a batch of telemetry.
 	MaxBatchInterval time.Duration
+
+	// Endpoint to use for querying the application profile (to get the
+	// correlation ID).  Defaults to EndpointUrl if unspecified.
+	ProfileQueryEndpoint string
 }
 
 // Creates a new TelemetryConfiguration object with the specified
@@ -42,5 +46,13 @@ func (config *TelemetryConfiguration) setupContext(context *TelemetryContext) {
 	if hostname, err := os.Hostname(); err == nil {
 		context.Tags.Device().SetId(hostname)
 		context.Tags.Cloud().SetRoleInstance(hostname)
+	}
+}
+
+func (config *TelemetryConfiguration) getCidEndpoint() string {
+	if config.ProfileQueryEndpoint != "" {
+		return config.ProfileQueryEndpoint
+	} else {
+		return config.EndpointUrl
 	}
 }

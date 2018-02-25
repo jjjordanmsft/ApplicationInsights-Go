@@ -6,6 +6,12 @@ import (
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights/contracts"
 )
 
+var cidManager cidLookup
+
+func init() {
+	cidManager = newCorrelationIdManager()
+}
+
 // Application Insights telemetry client provides interface to track telemetry
 // items.
 type TelemetryClient interface {
@@ -59,9 +65,10 @@ type TelemetryClient interface {
 }
 
 type telemetryClient struct {
-	channel   TelemetryChannel
-	context   *TelemetryContext
-	isEnabled bool
+	channel       TelemetryChannel
+	context       *TelemetryContext
+	correlationId string
+	isEnabled     bool
 }
 
 // Creates a new telemetry client instance that submits telemetry with the
@@ -78,11 +85,21 @@ func NewTelemetryClientFromConfig(config *TelemetryConfiguration) TelemetryClien
 
 	config.setupContext(context)
 
-	return &telemetryClient{
-		channel:   channel,
-		context:   context,
-		isEnabled: true,
+	client := &telemetryClient{
+		channel:       channel,
+		context:       context,
+		isEnabled:     true,
+		correlationId: "cid-v1:",
 	}
+
+	// Launch correlation ID lookup
+	cidManager.Query(config.getCidEndpoint(), config.InstrumentationKey, func(result *correlationResult) {
+		if result.err == nil {
+			client.correlationId = result.correlationId
+		}
+	})
+
+	return client
 }
 
 // Gets the telemetry context for this client.  Values found on this context
