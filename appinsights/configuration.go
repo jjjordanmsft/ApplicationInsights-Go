@@ -25,6 +25,10 @@ type TelemetryConfiguration struct {
 	// Endpoint to use for querying the application profile (to get the
 	// correlation ID).  Defaults to EndpointUrl if unspecified.
 	ProfileQueryEndpoint string
+	
+	// Don't send correlation headers to hosts on this list.  Hosts are
+	// specified as globs.
+	CorrelationHeaderExcludedDomains []string
 }
 
 // Creates a new TelemetryConfiguration object with the specified

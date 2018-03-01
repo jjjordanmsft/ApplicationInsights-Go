@@ -66,6 +66,7 @@ type TelemetryClient interface {
 type telemetryClient struct {
 	channel   TelemetryChannel
 	context   *TelemetryContext
+	config    *TelemetryConfiguration
 	isEnabled bool
 }
 
