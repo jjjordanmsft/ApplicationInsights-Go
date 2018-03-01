@@ -1,4 +1,4 @@
-package appinsights
+package aicollect
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ const (
 	correlationRetryWait = 10 * time.Second
 )
 
-type cidLookup interface {
+type CidLookup interface {
 	Query(baseUri, ikey string, callback correlationCallback)
 }
 
@@ -27,6 +27,7 @@ type correlationIdManager struct {
 type correlationCallback func(*correlationResult)
 
 type correlationLookup struct {
+	ikey      string
 	id        string
 	url       string
 	callbacks []correlationCallback
@@ -56,6 +57,7 @@ func (manager *correlationIdManager) Query(baseUri, ikey string, callback correl
 		pending.callbacks = append(pending.callbacks, callback)
 	} else {
 		lookup := &correlationLookup{
+			ikey:      ikey,
 			url:       url,
 			id:        id,
 			callbacks: []correlationCallback{callback},
@@ -67,18 +69,17 @@ func (manager *correlationIdManager) Query(baseUri, ikey string, callback correl
 }
 
 func (manager *correlationIdManager) lookup(lookup *correlationLookup) {
+	// diagnosticsWriter.Printf("Looking up correlation ID for %s", lookup.ikey)
+
 	var lastError error
 	for i := 0; i < correlationMaxRetry; i++ {
 		cid, retry, err := tryLookupCorrelationId(lookup.url)
 		if err == nil {
 			manager.postResult(lookup, cid, nil)
 			return
-		}
-
-		if retry {
+		} else if retry {
 			lastError = err
 			time.Sleep(correlationRetryWait)
-			continue
 		} else {
 			lastError = err
 			break
@@ -89,6 +90,12 @@ func (manager *correlationIdManager) lookup(lookup *correlationLookup) {
 }
 
 func (manager *correlationIdManager) postResult(lookup *correlationLookup, correlationId string, err error) {
+	if err != nil {
+		// diagnosticsWriter.Printf("Failed to lookup correlation ID for %s: %s", lookup.ikey, err.Error())
+	} else {
+		// diagnosticsWriter.Printf("Completed correlation ID lookup for %s", lookup.ikey)
+	}
+
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
 

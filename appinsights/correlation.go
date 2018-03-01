@@ -30,7 +30,7 @@ func ParseCorrelationProperties(header string) CorrelationProperties {
 	entries := strings.Split(header, ", ")
 	for _, entry := range entries {
 		kv := strings.SplitN(entry, "=", 2)
-		result[kv[0]] = result[kv[1]]
+		result[kv[0]] = kv[1]
 	}
 
 	return result

@@ -6,12 +6,6 @@ import (
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights/contracts"
 )
 
-var cidManager cidLookup
-
-func init() {
-	cidManager = newCorrelationIdManager()
-}
-
 // Application Insights telemetry client provides interface to track telemetry
 // items.
 type TelemetryClient interface {
@@ -19,6 +13,11 @@ type TelemetryClient interface {
 	// context will get written out to every telemetry item tracked by
 	// this client.
 	Context() *TelemetryContext
+
+	// Gets the configuration object that was used to initialize this
+	// client.  Changing the config will not have an effect on further
+	// operations of the client.
+	Config() *TelemetryConfiguration
 
 	// Gets the instrumentation key assigned to this telemetry client.
 	InstrumentationKey() string
@@ -65,10 +64,9 @@ type TelemetryClient interface {
 }
 
 type telemetryClient struct {
-	channel       TelemetryChannel
-	context       *TelemetryContext
-	correlationId string
-	isEnabled     bool
+	channel   TelemetryChannel
+	context   *TelemetryContext
+	isEnabled bool
 }
 
 // Creates a new telemetry client instance that submits telemetry with the
@@ -86,20 +84,20 @@ func NewTelemetryClientFromConfig(config *TelemetryConfiguration) TelemetryClien
 	config.setupContext(context)
 
 	client := &telemetryClient{
-		channel:       channel,
-		context:       context,
-		isEnabled:     true,
-		correlationId: "cid-v1:",
+		channel:   channel,
+		context:   context,
+		config:    config,
+		isEnabled: true,
 	}
 
-	// Launch correlation ID lookup
-	cidManager.Query(config.getCidEndpoint(), config.InstrumentationKey, func(result *correlationResult) {
-		if result.err == nil {
-			client.correlationId = result.correlationId
-		}
-	})
-
 	return client
+}
+
+// Gets the configuration object that was used to initialize this client.
+// Changing the config will not have an effect on further operations of the
+// client.
+func (tc *telemetryClient) Config() *TelemetryConfiguration {
+	return tc.config
 }
 
 // Gets the telemetry context for this client.  Values found on this context
