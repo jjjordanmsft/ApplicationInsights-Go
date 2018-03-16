@@ -346,8 +346,7 @@ func TestJsonSerializerNakedEvents(t *testing.T) {
 // Test helpers...
 
 func telemetryBuffer(items ...Telemetry) telemetryBufferItems {
-	ctx := NewTelemetryContext()
-	ctx.iKey = test_ikey
+	ctx := NewTelemetryContext(test_ikey)
 
 	var result telemetryBufferItems
 	for _, item := range items {

@@ -8,7 +8,7 @@ import (
 )
 
 func TestDefaultTags(t *testing.T) {
-	context := NewTelemetryContext()
+	context := NewTelemetryContext(test_ikey)
 	context.Tags["test"] = "OK"
 	context.Tags["no-write"] = "Fail"
 
@@ -27,7 +27,7 @@ func TestDefaultTags(t *testing.T) {
 }
 
 func TestCommonProperties(t *testing.T) {
-	context := NewTelemetryContext()
+	context := NewTelemetryContext(test_ikey)
 	context.CommonProperties = map[string]string{
 		"test":     "OK",
 		"no-write": "Fail",
@@ -78,7 +78,7 @@ func TestSanitize(t *testing.T) {
 	ev.Properties[name] = val
 	ev.Measurements[name] = 55.0
 
-	ctx := NewTelemetryContext()
+	ctx := NewTelemetryContext(test_ikey)
 	ctx.Tags.Session().SetId(name)
 
 	// We'll be looking for messages with these values:

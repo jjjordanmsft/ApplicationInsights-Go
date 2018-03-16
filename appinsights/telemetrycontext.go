@@ -24,8 +24,9 @@ type TelemetryContext struct {
 }
 
 // Creates a new, empty TelemetryContext
-func NewTelemetryContext() *TelemetryContext {
+func NewTelemetryContext(ikey string) *TelemetryContext {
 	return &TelemetryContext{
+		iKey:             ikey,
 		Tags:             make(contracts.ContextTags),
 		CommonProperties: make(map[string]string),
 	}

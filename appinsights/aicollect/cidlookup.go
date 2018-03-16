@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
 )
 
 const (
@@ -46,10 +49,20 @@ func newCorrelationIdManager() *correlationIdManager {
 }
 
 func (manager *correlationIdManager) Query(baseUri, ikey string, callback correlationCallback) {
+	baseUrl, err := url.Parse(baseUri)
+	if err != nil {
+		callback(&correlationResult{"", err})
+		return
+	}
+
+	baseUrl.RawQuery = ""
+	baseUrl.Fragment = ""
+	baseUrl.Path = "api/profiles/" + ikey + "/appId"
+	url := baseUrl.String()
+
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
 
-	url := fmt.Sprintf("%s/api/profiles/%s/appId", baseUri, ikey)
 	id := strings.ToUpper(url)
 	if result, ok := manager.results[id]; ok {
 		callback(result)
@@ -120,7 +133,7 @@ func tryLookupCorrelationId(url string) (string, bool, error) {
 	}
 
 	client := http.DefaultClient
-	resp, err := client.Do(req)
+	resp, err := client.Do(appinsights.MarkRequestIgnore(req))
 	if err != nil {
 		// Connection error: retry
 		return "", true, err

@@ -25,7 +25,7 @@ func NewOperationId() OperationId {
 	return OperationId("|" + uuid.NewV4().String() + ".")
 }
 
-func (id OperationId) GetRoot() string {
+func (id OperationId) GetRoot() OperationId {
 	idstr := string(id)
 	end := strings.IndexByte(idstr, '.')
 	if end < 0 {
@@ -33,9 +33,9 @@ func (id OperationId) GetRoot() string {
 	}
 
 	if idstr[0] == '|' {
-		return idstr[1:end]
+		return OperationId(idstr[1:end])
 	} else {
-		return idstr[:end]
+		return OperationId(idstr[:end])
 	}
 }
 

@@ -27,10 +27,12 @@ type CorrelationProperties map[string]string
 func ParseCorrelationProperties(header string) CorrelationProperties {
 	result := make(CorrelationProperties)
 
-	entries := strings.Split(header, ", ")
+	entries := strings.Split(header, ",")
 	for _, entry := range entries {
 		kv := strings.SplitN(entry, "=", 2)
-		result[kv[0]] = kv[1]
+		if len(kv) == 2 {
+			result[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+		}
 	}
 
 	return result
@@ -43,7 +45,7 @@ func (props CorrelationProperties) Serialize() string {
 			diagnosticsWriter.Printf("Custom properties must not contains '=' or ','. Dropping key \"%s\"", k)
 		} else {
 			if result.Len() > 0 {
-				result.WriteString(", ")
+				result.WriteRune(',')
 			}
 			result.WriteString(k)
 			result.WriteRune('=')

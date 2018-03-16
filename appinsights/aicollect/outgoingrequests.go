@@ -15,6 +15,7 @@ var defaultCorrelationExcludedDomains = []string{
 	"*.core.chinacloudapi.cn",
 	"*.core.cloudapi.de",
 	"*.core.usgovcloudapi.net",
+	"dc.services.visualstudio.com",
 }
 
 func InstrumentDefaultHTTPClient(client appinsights.TelemetryClient) {
@@ -50,7 +51,12 @@ type roundtripper struct {
 }
 
 func (t *roundtripper) RoundTrip(r *http.Request) (*http.Response, error) {
-	operation := appinsights.GetContextOperation(r.Context())
+	if appinsights.CheckContextIgnore(r.Context()) {
+		// Ignore this request.
+		return t.transport.RoundTrip(r)
+	}
+
+	operation := appinsights.UnwrapContextOperation(r.Context())
 	client := t.client
 	if operation != nil {
 		if !t.correlationBlacklist.MatchString(r.URL.Host) {
@@ -65,6 +71,7 @@ func (t *roundtripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	duration := time.Since(startTime)
 
 	telem := appinsights.NewRemoteDependencyTelemetry("", "HTTP", r.URL.Host, false)
+	telem.Name = r.Method + " " + r.URL.Path
 	telem.Timestamp = startTime
 	telem.Duration = duration
 	telem.Data = r.URL.String()
