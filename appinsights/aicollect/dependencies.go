@@ -19,20 +19,20 @@ var defaultCorrelationExcludedDomains = []string{
 }
 
 func InstrumentDefaultHTTPClient(client appinsights.TelemetryClient) {
-	http.DefaultClient = MakeHTTPClient(http.DefaultClient, client)
+	http.DefaultClient = NewHTTPClient(http.DefaultClient, client)
 }
 
-func MakeHTTPClient(httpClient *http.Client, aiClient appinsights.TelemetryClient) *http.Client {
+func NewHTTPClient(httpClient *http.Client, aiClient appinsights.TelemetryClient) *http.Client {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
 
 	result := *httpClient
-	result.Transport = MakeHTTPTransport(httpClient.Transport, aiClient)
+	result.Transport = NewHTTPTransport(httpClient.Transport, aiClient)
 	return &result
 }
 
-func MakeHTTPTransport(transport http.RoundTripper, aiClient appinsights.TelemetryClient) http.RoundTripper {
+func NewHTTPTransport(transport http.RoundTripper, aiClient appinsights.TelemetryClient) http.RoundTripper {
 	if transport == nil {
 		transport = http.DefaultTransport
 	}
@@ -56,7 +56,7 @@ func (t *roundtripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		return t.transport.RoundTrip(r)
 	}
 
-	operation := appinsights.UnwrapContextOperation(r.Context())
+	operation := appinsights.OperationFromContext(r.Context())
 	client := t.client
 	if operation != nil {
 		if !t.correlationBlacklist.MatchString(r.URL.Host) {
@@ -81,7 +81,7 @@ func (t *roundtripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		telem.ResultCode = "0"
 		// TODO: Err into data?
 	} else {
-		telem.Success = response.StatusCode < 400 || response.StatusCode == 401
+		telem.Success = response.StatusCode < 400
 		telem.ResultCode = response.Status
 	}
 

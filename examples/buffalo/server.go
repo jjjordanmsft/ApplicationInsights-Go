@@ -47,15 +47,19 @@ func App() *buffalo.App {
 	app.GET("/", IndexHandler)
 	app.GET("/panic", PanicHandler)
 	app.GET("/remote", RemoteHandler)
+	app.GET("/payme", PaymeHandler)
+
+	// FIXME: unhandled 404's are not detected.
 
 	return app
 }
 
 func IndexHandler(c buffalo.Context) error {
-	op := appinsights.UnwrapContextOperation(c)
+	op := appinsights.OperationFromContext(c)
 	if op == nil {
 		return c.Render(200, render.String("Couldn't get operation :-("))
 	}
+	op.TrackTrace("Hello world!", appinsights.Information)
 	return c.Render(200, render.String("Hello world!"))
 }
 
@@ -81,4 +85,8 @@ func RemoteHandler(c buffalo.Context) error {
 	}
 
 	return c.Render(200, render.String(string(body)))
+}
+
+func PaymeHandler(c buffalo.Context) error {
+	return c.Render(402, render.String("Payment required"))
 }

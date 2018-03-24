@@ -8,6 +8,7 @@ import (
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights/aicollect"
+	"github.com/urfave/negroni"
 )
 
 func main() {
@@ -19,7 +20,7 @@ func main() {
 		log.Fatal("Supply an instrumentation key in the IKEY environment variable")
 	}
 
-	telemetryClient.Context().CommonProperties["http_framework"] = "net/http"
+	telemetryClient.Context().CommonProperties["http_framework"] = "negroni"
 	aicollect.InstrumentDefaultHTTPClient(telemetryClient)
 	appinsights.NewDiagnosticsMessageListener(func(msg string) error {
 		log.Println(msg)
@@ -28,14 +29,18 @@ func main() {
 
 	// http server setup
 	mux := http.NewServeMux()
-	middleware := aicollect.NewHTTPMiddleware(telemetryClient)
 
 	mux.Handle("/", http.HandlerFunc(IndexHandler))
 	mux.Handle("/panic", http.HandlerFunc(PanicHandler))
 	mux.Handle("/remote", http.HandlerFunc(RemoteHandler))
 	mux.Handle("/payme", http.HandlerFunc(PaymeHandler))
 
-	http.ListenAndServe("127.0.0.1:3000", middleware.Handler(mux))
+	n := negroni.Classic()
+	n.Use(aicollect.NewHTTPMiddleware(telemetryClient))
+	n.UseHandler(mux)
+	n.Run("127.0.0.1:3000")
+
+	// TODO: Graceful shutdown doesn't work.
 	<-telemetryClient.Channel().Close()
 }
 
@@ -44,6 +49,7 @@ func IndexHandler(rw http.ResponseWriter, r *http.Request) {
 	if op == nil {
 		rw.Write([]byte("Couldn't get operation :-("))
 	} else {
+		op.TrackTrace("Hello world!", appinsights.Information)
 		rw.Write([]byte("Hello world!"))
 	}
 }

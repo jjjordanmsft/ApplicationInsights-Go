@@ -5,17 +5,19 @@ import (
 	"net/http"
 )
 
+type contextKey string
+
 const (
-	operationContextKey        = "Microsoft.ApplicationInsights.Operation"
-	requestTelemetryContextKey = "Microsoft.ApplicationInsights.RequestTelemetry"
-	ignoreContextKey           = "Microsoft.ApplicationInsights.Ignore"
+	operationContextKey        contextKey = "Microsoft.ApplicationInsights.Operation"
+	requestTelemetryContextKey contextKey = "Microsoft.ApplicationInsights.RequestTelemetry"
+	ignoreContextKey           contextKey = "Microsoft.ApplicationInsights.Ignore"
 )
 
 func WrapContextOperation(ctx context.Context, op Operation) context.Context {
 	return context.WithValue(ctx, operationContextKey, op)
 }
 
-func UnwrapContextOperation(ctx context.Context) Operation {
+func OperationFromContext(ctx context.Context) Operation {
 	if obj := ctx.Value(operationContextKey); obj != nil {
 		if op, ok := obj.(*operation); ok {
 			return op
@@ -41,7 +43,7 @@ func WrapContextRequestTelemetry(ctx context.Context, t *RequestTelemetry) conte
 	return context.WithValue(ctx, requestTelemetryContextKey, t)
 }
 
-func UnwrapContextRequestTelemetry(ctx context.Context) *RequestTelemetry {
+func RequestTelemetryFromContext(ctx context.Context) *RequestTelemetry {
 	if obj := ctx.Value(requestTelemetryContextKey); obj != nil {
 		if t, ok := obj.(*RequestTelemetry); ok {
 			return t

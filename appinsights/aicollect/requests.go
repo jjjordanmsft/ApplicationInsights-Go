@@ -39,17 +39,17 @@ func NewHTTPMiddleware(client appinsights.TelemetryClient) *HTTPMiddleware {
 
 func (middleware *HTTPMiddleware) HandlerFunc(handler http.HandlerFunc) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		middleware.trackRequest(rw, r, handler)
+		middleware.ServeHTTP(rw, r, handler)
 	}
 }
 
 func (middleware *HTTPMiddleware) Handler(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		middleware.trackRequest(rw, r, handler.ServeHTTP)
+		middleware.ServeHTTP(rw, r, handler.ServeHTTP)
 	})
 }
 
-func (middleware *HTTPMiddleware) trackRequest(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+func (middleware *HTTPMiddleware) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	startTime := time.Now()
 	telem := appinsights.NewRequestTelemetry(r.Method, r.URL.String(), 0, "200")
 	correlation, id := parseCorrelationHeaders(r)
@@ -61,10 +61,10 @@ func (middleware *HTTPMiddleware) trackRequest(rw http.ResponseWriter, r *http.R
 	telem.Tags[contracts.LocationIp] = getIp(r)
 	telem.Source = getCorrelatedSource(correlation)
 
-	newRequest := r.WithContext(appinsights.WrapContextOperation(r.Context(), operation))
+	newRequest := r.WithContext(appinsights.WrapContextRequestTelemetry(appinsights.WrapContextOperation(r.Context(), operation), telem))
 	newWriter := &responseWriter{
+		ResponseWriter: rw,
 		telem:         telem,
-		writer:        rw,
 		statusWritten: false,
 	}
 
@@ -127,13 +127,9 @@ func getIp(req *http.Request) string {
 }
 
 type responseWriter struct {
+	http.ResponseWriter
 	telem         *appinsights.RequestTelemetry
-	writer        http.ResponseWriter
 	statusWritten bool
-}
-
-func (w *responseWriter) Header() http.Header {
-	return w.writer.Header()
 }
 
 func (w *responseWriter) Write(data []byte) (int, error) {
@@ -143,7 +139,7 @@ func (w *responseWriter) Write(data []byte) (int, error) {
 		w.telem.Success = true
 	}
 
-	return w.writer.Write(data)
+	return w.ResponseWriter.Write(data)
 }
 
 func (w *responseWriter) WriteHeader(statusCode int) {
@@ -153,5 +149,5 @@ func (w *responseWriter) WriteHeader(statusCode int) {
 		w.telem.Success = statusCode < 400 || statusCode == 401
 	}
 
-	w.writer.WriteHeader(statusCode)
+	w.ResponseWriter.WriteHeader(statusCode)
 }

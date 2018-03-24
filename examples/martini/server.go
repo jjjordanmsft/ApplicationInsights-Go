@@ -8,6 +8,7 @@ import (
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights/aicollect"
+	"github.com/go-martini/martini"
 )
 
 func main() {
@@ -19,7 +20,7 @@ func main() {
 		log.Fatal("Supply an instrumentation key in the IKEY environment variable")
 	}
 
-	telemetryClient.Context().CommonProperties["http_framework"] = "net/http"
+	telemetryClient.Context().CommonProperties["http_framework"] = "martini"
 	aicollect.InstrumentDefaultHTTPClient(telemetryClient)
 	appinsights.NewDiagnosticsMessageListener(func(msg string) error {
 		log.Println(msg)
@@ -27,16 +28,16 @@ func main() {
 	})
 
 	// http server setup
-	mux := http.NewServeMux()
-	middleware := aicollect.NewHTTPMiddleware(telemetryClient)
+	m := martini.Classic()
+	m.Use(Middleware(telemetryClient))
+	m.Get("/", IndexHandler)
+	m.Get("/panic", PanicHandler)
+	m.Get("/remote", RemoteHandler)
+	m.Get("/payme", PaymeHandler)
 
-	mux.Handle("/", http.HandlerFunc(IndexHandler))
-	mux.Handle("/panic", http.HandlerFunc(PanicHandler))
-	mux.Handle("/remote", http.HandlerFunc(RemoteHandler))
-	mux.Handle("/payme", http.HandlerFunc(PaymeHandler))
-
-	http.ListenAndServe("127.0.0.1:3000", middleware.Handler(mux))
-	<-telemetryClient.Channel().Close()
+	// TODO: Graceful shutdown doesn't work.
+	defer func() { <-telemetryClient.Channel().Close() }()
+	m.Run()
 }
 
 func IndexHandler(rw http.ResponseWriter, r *http.Request) {
@@ -44,6 +45,7 @@ func IndexHandler(rw http.ResponseWriter, r *http.Request) {
 	if op == nil {
 		rw.Write([]byte("Couldn't get operation :-("))
 	} else {
+		op.TrackTrace("Hello world!", appinsights.Information)
 		rw.Write([]byte("Hello world!"))
 	}
 }

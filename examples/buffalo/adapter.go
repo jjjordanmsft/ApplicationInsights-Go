@@ -2,10 +2,12 @@ package main
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights/aicollect"
 	"github.com/gobuffalo/buffalo"
+	"github.com/gobuffalo/buffalo/render"
 )
 
 // Middleware is an adapter so that the AI middleware's HandlerFunc can be used in buffalo.
@@ -41,6 +43,16 @@ func (ctx *context) Request() *http.Request {
 
 func (ctx *context) Response() http.ResponseWriter {
 	return ctx.response
+}
+
+func (ctx *context) Render(code int, rr render.Renderer) error {
+	telem := appinsights.RequestTelemetryFromContext(ctx)
+	if telem != nil {
+		telem.ResponseCode = strconv.Itoa(code)
+		telem.Success = code < 400 || code == 401
+	}
+
+	return ctx.Context.Render(code, rr)
 }
 
 func (ctx *context) Value(key interface{}) interface{} {

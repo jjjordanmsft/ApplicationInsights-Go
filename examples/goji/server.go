@@ -8,6 +8,7 @@ import (
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights/aicollect"
+	"github.com/zenazn/goji"
 )
 
 func main() {
@@ -19,23 +20,23 @@ func main() {
 		log.Fatal("Supply an instrumentation key in the IKEY environment variable")
 	}
 
-	telemetryClient.Context().CommonProperties["http_framework"] = "net/http"
+	telemetryClient.Context().CommonProperties["http_framework"] = "goji"
 	aicollect.InstrumentDefaultHTTPClient(telemetryClient)
 	appinsights.NewDiagnosticsMessageListener(func(msg string) error {
 		log.Println(msg)
 		return nil
 	})
 
-	// http server setup
-	mux := http.NewServeMux()
+	// Inject middleware
 	middleware := aicollect.NewHTTPMiddleware(telemetryClient)
+	goji.Use(middleware.Handler)
 
-	mux.Handle("/", http.HandlerFunc(IndexHandler))
-	mux.Handle("/panic", http.HandlerFunc(PanicHandler))
-	mux.Handle("/remote", http.HandlerFunc(RemoteHandler))
-	mux.Handle("/payme", http.HandlerFunc(PaymeHandler))
+	goji.Get("/", IndexHandler)
+	goji.Get("/panic", PanicHandler)
+	goji.Get("/remote", RemoteHandler)
+	goji.Get("/payme", PaymeHandler)
 
-	http.ListenAndServe("127.0.0.1:3000", middleware.Handler(mux))
+	goji.Serve()
 	<-telemetryClient.Channel().Close()
 }
 
@@ -44,6 +45,7 @@ func IndexHandler(rw http.ResponseWriter, r *http.Request) {
 	if op == nil {
 		rw.Write([]byte("Couldn't get operation :-("))
 	} else {
+		op.TrackTrace("Hello world!", appinsights.Information)
 		rw.Write([]byte("Hello world!"))
 	}
 }
