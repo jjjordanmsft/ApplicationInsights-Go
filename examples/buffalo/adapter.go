@@ -8,7 +8,9 @@ import (
 	"github.com/gobuffalo/buffalo"
 )
 
-// Middleware is an adapter so that
+// Middleware is an adapter so that the AI middleware's HandlerFunc can be used in buffalo.
+// This should be added via:
+//   app.Use(Middleware(telemetryClient))
 func Middleware(telemetryClient appinsights.TelemetryClient) buffalo.MiddlewareFunc {
 	middleware := aicollect.NewHTTPMiddleware(telemetryClient)
 	return func(next buffalo.Handler) buffalo.Handler {
