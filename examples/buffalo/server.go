@@ -41,11 +41,8 @@ func main() {
 }
 
 func App() *buffalo.App {
-	aimiddleware := aicollect.NewHTTPMiddleware(telemetryClient)
-
-	app := buffalo.New(buffalo.Options{
-		PreWares: []buffalo.PreWare{aimiddleware.Handler},
-	})
+	app := buffalo.New(buffalo.Options{})
+	app.Use(Middleware(telemetryClient))
 
 	app.GET("/", IndexHandler)
 	app.GET("/panic", PanicHandler)
