@@ -12,29 +12,13 @@ import (
 )
 
 type HTTPMiddleware struct {
-	client        appinsights.TelemetryClient
-	correlationId string
+	client appinsights.TelemetryClient
 }
 
 func NewHTTPMiddleware(client appinsights.TelemetryClient) *HTTPMiddleware {
-	middleware := &HTTPMiddleware{
-		client:        client,
-		correlationId: "cid-v1:",
+	return &HTTPMiddleware{
+		client: client,
 	}
-
-	config := client.Config()
-	profileEndpoint := config.ProfileQueryEndpoint
-	if profileEndpoint == "" {
-		profileEndpoint = config.EndpointUrl
-	}
-
-	cidLookup.Query(profileEndpoint, client.InstrumentationKey(), func(result *correlationResult) {
-		if result.err == nil {
-			middleware.correlationId = result.correlationId
-		}
-	})
-
-	return middleware
 }
 
 func (middleware *HTTPMiddleware) HandlerFunc(handler http.HandlerFunc) http.HandlerFunc {
@@ -64,8 +48,8 @@ func (middleware *HTTPMiddleware) ServeHTTP(rw http.ResponseWriter, r *http.Requ
 	newRequest := r.WithContext(appinsights.WrapContextRequestTelemetry(appinsights.WrapContextOperation(r.Context(), operation), telem))
 	newWriter := &responseWriter{
 		ResponseWriter: rw,
-		telem:         telem,
-		statusWritten: false,
+		telem:          telem,
+		statusWritten:  false,
 	}
 
 	defer func() {

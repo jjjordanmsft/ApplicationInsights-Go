@@ -1,4 +1,4 @@
-package aicollect
+package appinsights
 
 import (
 	"fmt"
@@ -8,16 +8,15 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
 )
 
 const (
 	correlationMaxRetry  = 5
 	correlationRetryWait = 10 * time.Second
+	correlationIdPrefix  = "cid-v1:"
 )
 
-type CidLookup interface {
+type cidLookup interface {
 	Query(baseUri, ikey string, callback correlationCallback)
 }
 
@@ -39,6 +38,12 @@ type correlationLookup struct {
 type correlationResult struct {
 	correlationId string
 	err           error
+}
+
+var correlationManager cidLookup
+
+func init() {
+	correlationManager = newCorrelationIdManager()
 }
 
 func newCorrelationIdManager() *correlationIdManager {
@@ -82,7 +87,7 @@ func (manager *correlationIdManager) Query(baseUri, ikey string, callback correl
 }
 
 func (manager *correlationIdManager) lookup(lookup *correlationLookup) {
-	// diagnosticsWriter.Printf("Looking up correlation ID for %s", lookup.ikey)
+	diagnosticsWriter.Printf("Looking up correlation ID for %s", lookup.ikey)
 
 	var lastError error
 	for i := 0; i < correlationMaxRetry; i++ {
@@ -104,9 +109,9 @@ func (manager *correlationIdManager) lookup(lookup *correlationLookup) {
 
 func (manager *correlationIdManager) postResult(lookup *correlationLookup, correlationId string, err error) {
 	if err != nil {
-		// diagnosticsWriter.Printf("Failed to lookup correlation ID for %s: %s", lookup.ikey, err.Error())
+		diagnosticsWriter.Printf("Failed to lookup correlation ID for %s: %s", lookup.ikey, err.Error())
 	} else {
-		// diagnosticsWriter.Printf("Completed correlation ID lookup for %s", lookup.ikey)
+		diagnosticsWriter.Printf("Completed correlation ID lookup for %s", lookup.ikey)
 	}
 
 	manager.lock.Lock()
@@ -133,7 +138,7 @@ func tryLookupCorrelationId(url string) (string, bool, error) {
 	}
 
 	client := http.DefaultClient
-	resp, err := client.Do(appinsights.MarkRequestIgnore(req))
+	resp, err := client.Do(MarkRequestIgnore(req))
 	if err != nil {
 		// Connection error: retry
 		return "", true, err

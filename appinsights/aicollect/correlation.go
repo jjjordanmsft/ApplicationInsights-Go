@@ -16,12 +16,6 @@ const (
 	correlationContextHeader        = "correlation-context"
 )
 
-var cidLookup CidLookup
-
-func init() {
-	cidLookup = newCorrelationIdManager()
-}
-
 func parseCorrelationHeaders(r *http.Request) (*appinsights.CorrelationContext, appinsights.OperationId) {
 	parentId := appinsights.OperationId(r.Header.Get(requestIdHeader))
 	requestId := parentId.GenerateRequestId()

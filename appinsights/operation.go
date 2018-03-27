@@ -12,6 +12,7 @@ type Operation interface {
 type operation struct {
 	telemetryClient
 	correlationContext *CorrelationContext
+	originalClient TelemetryClient
 }
 
 func NewOperation(client TelemetryClient, correlation *CorrelationContext) Operation {
@@ -29,6 +30,7 @@ func NewOperation(client TelemetryClient, correlation *CorrelationContext) Opera
 
 	return &operation{
 		correlationContext: correlation,
+		originalClient: client,
 		telemetryClient: telemetryClient{
 			channel:   client.Channel(),
 			context:   context,
@@ -40,4 +42,8 @@ func NewOperation(client TelemetryClient, correlation *CorrelationContext) Opera
 
 func (op *operation) Correlation() *CorrelationContext {
 	return op.correlationContext
+}
+
+func (op *operation) CorrelationId() string {
+	return op.originalClient.CorrelationId()
 }

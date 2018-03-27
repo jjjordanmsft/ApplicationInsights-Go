@@ -25,6 +25,9 @@ type TelemetryClient interface {
 	// Gets the telemetry channel used to submit data to the backend.
 	Channel() TelemetryChannel
 
+	// Gets the correlation ID for this application
+	CorrelationId() string
+
 	// Gets whether this client is enabled and will accept telemetry.
 	IsEnabled() bool
 
@@ -67,6 +70,7 @@ type telemetryClient struct {
 	channel   TelemetryChannel
 	context   *TelemetryContext
 	config    *TelemetryConfiguration
+	cid       string
 	isEnabled bool
 }
 
@@ -91,6 +95,11 @@ func NewTelemetryClientFromConfig(config *TelemetryConfiguration) TelemetryClien
 		isEnabled: true,
 	}
 
+	client.cid = correlationIdPrefix
+	correlationManager.Query(config.getCidEndpoint(), config.InstrumentationKey, func(result *correlationResult) {
+		client.cid = result.correlationId
+	})
+
 	return client
 }
 
@@ -99,6 +108,10 @@ func NewTelemetryClientFromConfig(config *TelemetryConfiguration) TelemetryClien
 // client.
 func (tc *telemetryClient) Config() *TelemetryConfiguration {
 	return tc.config
+}
+
+func (tc *telemetryClient) CorrelationId() string {
+	return tc.cid
 }
 
 // Gets the telemetry context for this client.  Values found on this context
