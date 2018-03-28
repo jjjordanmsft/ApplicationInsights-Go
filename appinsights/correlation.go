@@ -14,6 +14,14 @@ type CorrelationContext struct {
 }
 
 func NewCorrelationContext(operationId, parentId OperationId, name string, properties CorrelationProperties) *CorrelationContext {
+	if string(operationId) == "" {
+		operationId = NewOperationId()
+	}
+
+	if string(parentId) == "" {
+		parentId = operationId
+	}
+
 	return &CorrelationContext{
 		Name:       name,
 		Id:         operationId,

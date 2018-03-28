@@ -62,7 +62,7 @@ func (manager *correlationIdManager) Query(baseUri, ikey string, callback correl
 
 	baseUrl.RawQuery = ""
 	baseUrl.Fragment = ""
-	baseUrl.Path = "api/profiles/" + ikey + "/appId"
+	baseUrl.Path = fmt.Sprintf("api/profiles/%s/appId", ikey)
 	url := baseUrl.String()
 
 	manager.lock.Lock()
@@ -116,6 +116,10 @@ func (manager *correlationIdManager) postResult(lookup *correlationLookup, corre
 
 	manager.lock.Lock()
 	defer manager.lock.Unlock()
+
+	if err == nil {
+		correlationId = correlationIdPrefix + correlationId
+	}
 
 	result := &correlationResult{
 		correlationId: correlationId,

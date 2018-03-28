@@ -36,13 +36,18 @@ func (middleware *HTTPMiddleware) Handler(handler http.Handler) http.Handler {
 func (middleware *HTTPMiddleware) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
 	startTime := time.Now()
 	telem := appinsights.NewRequestTelemetry(r.Method, r.URL.String(), 0, "200")
-	correlation, id := parseCorrelationHeaders(r)
-	correlation.Name = telem.Name
+	headers := parseCorrelationRequestHeaders(r)
+	correlation := appinsights.NewCorrelationContext(headers.requestId.GetRoot(), headers.requestId, telem.Name, headers.properties)
+	if string(headers.parentId) == "" {
+		telem.Tags[contracts.OperationParentId] = string(headers.rootId)
+	} else {
+		telem.Tags[contracts.OperationParentId] = string(headers.parentId)
+	}
 	operation := appinsights.NewOperation(middleware.client, correlation)
 
-	telem.Id = string(id)
+	telem.Id = string(headers.requestId)
 	telem.Tags["ai.user.userAgent"] = r.UserAgent()
-	telem.Tags[contracts.LocationIp] = getIp(r)
+	telem.Tags[contracts.LocationIp] = getIP(r)
 	telem.Source = getCorrelatedSource(correlation)
 
 	newRequest := r.WithContext(appinsights.WrapContextRequestTelemetry(appinsights.WrapContextOperation(r.Context(), operation), telem))
@@ -50,6 +55,11 @@ func (middleware *HTTPMiddleware) ServeHTTP(rw http.ResponseWriter, r *http.Requ
 		ResponseWriter: rw,
 		telem:          telem,
 		statusWritten:  false,
+	}
+
+	// Write response header
+	if true { // ???
+		writeCorrelationResponseHeaders(rw, operation)
 	}
 
 	defer func() {
@@ -71,7 +81,7 @@ func (middleware *HTTPMiddleware) ServeHTTP(rw http.ResponseWriter, r *http.Requ
 	next(newWriter, newRequest)
 }
 
-func getIp(req *http.Request) string {
+func getIP(req *http.Request) string {
 	if xff := req.Header.Get("x-forwarded-for"); xff != "" {
 		if comma := strings.IndexByte(xff, ','); comma >= 0 {
 			firstIP := strings.TrimSpace(xff[:comma])

@@ -2,9 +2,12 @@ package aicollect
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
@@ -17,6 +20,15 @@ var defaultCorrelationExcludedDomains = []string{
 	"*.core.usgovcloudapi.net",
 	"dc.services.visualstudio.com",
 }
+
+const (
+	dependencyTypeHttp  = "Http"
+	dependencyTypeAI    = "Http (tracked component)"
+	correlationIdPrefix = "cid-v1:" // TODO: Deduplicate
+)
+
+// Monotonically increasing request number
+var dependencyRequestNumber uint64 = 0
 
 func InstrumentDefaultHTTPClient(client appinsights.TelemetryClient) {
 	http.DefaultClient = NewHTTPClient(http.DefaultClient, client)
@@ -58,9 +70,11 @@ func (t *roundtripper) RoundTrip(r *http.Request) (*http.Response, error) {
 
 	operation := appinsights.OperationFromContext(r.Context())
 	client := t.client
+	var id string
+
 	if operation != nil {
 		if !t.correlationBlacklist.MatchString(r.URL.Host) {
-			// TODO: Add correlation headers..
+			id = attachCorrelationRequestHeaders(r, operation)
 		}
 
 		client = operation
@@ -70,11 +84,12 @@ func (t *roundtripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	response, err := t.transport.RoundTrip(r)
 	duration := time.Since(startTime)
 
-	telem := appinsights.NewRemoteDependencyTelemetry("", "HTTP", r.URL.Host, false)
+	telem := appinsights.NewRemoteDependencyTelemetry("", dependencyTypeHttp, r.URL.Host, false)
 	telem.Name = r.Method + " " + r.URL.Path
 	telem.Timestamp = startTime
 	telem.Duration = duration
 	telem.Data = r.URL.String()
+	telem.Id = id
 
 	if err != nil {
 		telem.Success = false
@@ -83,6 +98,12 @@ func (t *roundtripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	} else {
 		telem.Success = response.StatusCode < 400
 		telem.ResultCode = response.Status
+	}
+
+	headers := parseCorrelationResponseHeaders(response)
+	if headers.correlationId != "" && headers.correlationId != correlationIdPrefix {
+		telem.Target = fmt.Sprintf("%s | %s | roleName:%s", r.URL.Host, headers.correlationId, headers.targetRoleName)
+		telem.Type = dependencyTypeAI
 	}
 
 	client.Track(telem)
@@ -123,4 +144,9 @@ func globToPattern(glob string) string {
 	}
 
 	return pattern.String()
+}
+
+func nextDependencyNumber() string {
+	value := atomic.AddUint64(&dependencyRequestNumber, 1)
+	return strconv.FormatUint(value, 10)
 }
