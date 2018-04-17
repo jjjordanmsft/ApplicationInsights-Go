@@ -2,12 +2,9 @@ package aicollect
 
 import (
 	"bytes"
-	"fmt"
 	"net/http"
 	"regexp"
-	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
@@ -26,9 +23,6 @@ const (
 	dependencyTypeAI    = "Http (tracked component)"
 	correlationIdPrefix = "cid-v1:" // TODO: Deduplicate
 )
-
-// Monotonically increasing request number
-var dependencyRequestNumber uint64 = 0
 
 func InstrumentDefaultHTTPClient(client appinsights.TelemetryClient) {
 	http.DefaultClient = NewHTTPClient(http.DefaultClient, client)
@@ -102,7 +96,7 @@ func (t *roundtripper) RoundTrip(r *http.Request) (*http.Response, error) {
 
 	headers := parseCorrelationResponseHeaders(response)
 	if headers.correlationId != "" && headers.correlationId != correlationIdPrefix {
-		telem.Target = fmt.Sprintf("%s | %s | roleName:%s", r.URL.Host, headers.correlationId, headers.targetRoleName)
+		telem.Target = headers.getCorrelatedTarget(r.URL)
 		telem.Type = dependencyTypeAI
 	}
 
@@ -144,9 +138,4 @@ func globToPattern(glob string) string {
 	}
 
 	return pattern.String()
-}
-
-func nextDependencyNumber() string {
-	value := atomic.AddUint64(&dependencyRequestNumber, 1)
-	return strconv.FormatUint(value, 10)
 }

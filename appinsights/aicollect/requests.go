@@ -48,7 +48,7 @@ func (middleware *HTTPMiddleware) ServeHTTP(rw http.ResponseWriter, r *http.Requ
 	telem.Id = string(headers.requestId)
 	telem.Tags["ai.user.userAgent"] = r.UserAgent()
 	telem.Tags[contracts.LocationIp] = getIP(r)
-	telem.Source = getCorrelatedSource(correlation)
+	telem.Source = headers.getCorrelatedSource()
 
 	newRequest := r.WithContext(appinsights.WrapContextRequestTelemetry(appinsights.WrapContextOperation(r.Context(), operation), telem))
 	newWriter := &responseWriter{

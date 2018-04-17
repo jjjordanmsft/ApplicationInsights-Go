@@ -89,6 +89,7 @@ func (ch *mockChannel) Close(retryTimeout ...time.Duration) <-chan struct{} {
 func newMockTelemetryClient(config *appinsights.TelemetryConfiguration, cid string) (appinsights.TelemetryClient, *mockChannel) {
 	config.ProfileQueryEndpoint = "<<Invalid URL>>"
 	client := appinsights.NewTelemetryClientFromConfig(config)
+	client.Context().Tags.Cloud().SetRole("endtoend")
 	client.Channel().Close()
 	channel := &mockChannel{}
 	cv := reflect.Indirect(reflect.ValueOf(client))
