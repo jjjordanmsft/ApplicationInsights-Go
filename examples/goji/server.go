@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
-	"github.com/Microsoft/ApplicationInsights-Go/appinsights/aicollect"
+	"github.com/Microsoft/ApplicationInsights-Go/appinsights/autocollection"
 	"github.com/zenazn/goji"
 )
 
@@ -21,14 +21,14 @@ func main() {
 	}
 
 	telemetryClient.Context().CommonProperties["http_framework"] = "goji"
-	aicollect.InstrumentDefaultHTTPClient(telemetryClient)
+	autocollection.InstrumentDefaultHTTPClient(telemetryClient)
 	appinsights.NewDiagnosticsMessageListener(func(msg string) error {
 		log.Println(msg)
 		return nil
 	})
 
 	// Inject middleware
-	middleware := aicollect.NewHTTPMiddleware(telemetryClient)
+	middleware := autocollection.NewHTTPMiddleware(telemetryClient)
 	goji.Use(middleware.Handler)
 
 	goji.Get("/", IndexHandler)

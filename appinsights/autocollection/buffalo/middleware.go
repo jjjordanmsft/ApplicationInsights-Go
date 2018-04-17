@@ -1,11 +1,11 @@
-package main
+package buffalo
 
 import (
 	"net/http"
 	"strconv"
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
-	"github.com/Microsoft/ApplicationInsights-Go/appinsights/aicollect"
+	"github.com/Microsoft/ApplicationInsights-Go/appinsights/autocollection"
 	"github.com/gobuffalo/buffalo"
 	"github.com/gobuffalo/buffalo/render"
 )
@@ -14,7 +14,7 @@ import (
 // This should be added via:
 //   app.Use(Middleware(telemetryClient))
 func Middleware(telemetryClient appinsights.TelemetryClient) buffalo.MiddlewareFunc {
-	middleware := aicollect.NewHTTPMiddleware(telemetryClient)
+	middleware := autocollection.NewHTTPMiddleware(telemetryClient)
 	return func(next buffalo.Handler) buffalo.Handler {
 		return func(c buffalo.Context) error {
 			var err error

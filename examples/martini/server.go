@@ -7,7 +7,8 @@ import (
 	"os"
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
-	"github.com/Microsoft/ApplicationInsights-Go/appinsights/aicollect"
+	"github.com/Microsoft/ApplicationInsights-Go/appinsights/autocollection"
+	aimartini "github.com/Microsoft/ApplicationInsights-Go/appinsights/autocollection/martini"
 	"github.com/go-martini/martini"
 )
 
@@ -21,7 +22,7 @@ func main() {
 	}
 
 	telemetryClient.Context().CommonProperties["http_framework"] = "martini"
-	aicollect.InstrumentDefaultHTTPClient(telemetryClient)
+	autocollection.InstrumentDefaultHTTPClient(telemetryClient)
 	appinsights.NewDiagnosticsMessageListener(func(msg string) error {
 		log.Println(msg)
 		return nil
@@ -29,7 +30,7 @@ func main() {
 
 	// http server setup
 	m := martini.Classic()
-	m.Use(Middleware(telemetryClient))
+	m.Use(aimartini.Middleware(telemetryClient))
 	m.Get("/", IndexHandler)
 	m.Get("/panic", PanicHandler)
 	m.Get("/remote", RemoteHandler)

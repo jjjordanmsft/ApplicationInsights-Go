@@ -1,4 +1,4 @@
-package aicollect
+package autocollection
 
 import (
 	"fmt"

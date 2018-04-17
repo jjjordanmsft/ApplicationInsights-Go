@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
-	"github.com/Microsoft/ApplicationInsights-Go/appinsights/aicollect"
+	"github.com/Microsoft/ApplicationInsights-Go/appinsights/autocollection"
 )
 
 func main() {
@@ -20,7 +20,7 @@ func main() {
 	}
 
 	telemetryClient.Context().CommonProperties["http_framework"] = "net/http"
-	aicollect.InstrumentDefaultHTTPClient(telemetryClient)
+	autocollection.InstrumentDefaultHTTPClient(telemetryClient)
 	appinsights.NewDiagnosticsMessageListener(func(msg string) error {
 		log.Println(msg)
 		return nil
@@ -28,7 +28,7 @@ func main() {
 
 	// http server setup
 	mux := http.NewServeMux()
-	middleware := aicollect.NewHTTPMiddleware(telemetryClient)
+	middleware := autocollection.NewHTTPMiddleware(telemetryClient)
 
 	mux.Handle("/", http.HandlerFunc(IndexHandler))
 	mux.Handle("/panic", http.HandlerFunc(PanicHandler))

@@ -7,7 +7,8 @@ import (
 	"os"
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
-	"github.com/Microsoft/ApplicationInsights-Go/appinsights/aicollect"
+	"github.com/Microsoft/ApplicationInsights-Go/appinsights/autocollection"
+	aibuffalo "github.com/Microsoft/ApplicationInsights-Go/appinsights/autocollection/buffalo"
 	"github.com/gobuffalo/buffalo"
 	"github.com/gobuffalo/buffalo/render"
 )
@@ -23,7 +24,7 @@ func init() {
 	}
 
 	telemetryClient.Context().CommonProperties["http_framework"] = "buffalo"
-	aicollect.InstrumentDefaultHTTPClient(telemetryClient)
+	autocollection.InstrumentDefaultHTTPClient(telemetryClient)
 	appinsights.NewDiagnosticsMessageListener(func(msg string) error {
 		log.Println(msg)
 		return nil
@@ -42,7 +43,7 @@ func main() {
 
 func App() *buffalo.App {
 	app := buffalo.New(buffalo.Options{})
-	app.Use(Middleware(telemetryClient))
+	app.Use(aibuffalo.Middleware(telemetryClient))
 
 	app.GET("/", IndexHandler)
 	app.GET("/panic", PanicHandler)

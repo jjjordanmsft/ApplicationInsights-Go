@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
-	"github.com/Microsoft/ApplicationInsights-Go/appinsights/aicollect"
+	"github.com/Microsoft/ApplicationInsights-Go/appinsights/autocollection"
 	"github.com/urfave/negroni"
 )
 
@@ -21,7 +21,7 @@ func main() {
 	}
 
 	telemetryClient.Context().CommonProperties["http_framework"] = "negroni"
-	aicollect.InstrumentDefaultHTTPClient(telemetryClient)
+	autocollection.InstrumentDefaultHTTPClient(telemetryClient)
 	appinsights.NewDiagnosticsMessageListener(func(msg string) error {
 		log.Println(msg)
 		return nil
@@ -36,7 +36,7 @@ func main() {
 	mux.Handle("/payme", http.HandlerFunc(PaymeHandler))
 
 	n := negroni.Classic()
-	n.Use(aicollect.NewHTTPMiddleware(telemetryClient))
+	n.Use(autocollection.NewHTTPMiddleware(telemetryClient))
 	n.UseHandler(mux)
 	n.Run("127.0.0.1:3000")
 

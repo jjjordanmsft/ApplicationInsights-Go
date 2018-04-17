@@ -1,16 +1,16 @@
-package main
+package gin
 
 import (
 	"net/http"
 	"strconv"
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
-	"github.com/Microsoft/ApplicationInsights-Go/appinsights/aicollect"
+	"github.com/Microsoft/ApplicationInsights-Go/appinsights/autocollection"
 	"github.com/gin-gonic/gin"
 )
 
 func Middleware(telemetryClient appinsights.TelemetryClient) gin.HandlerFunc {
-	middleware := aicollect.NewHTTPMiddleware(telemetryClient)
+	middleware := autocollection.NewHTTPMiddleware(telemetryClient)
 	return func(c *gin.Context) {
 		middleware.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 			c.Request = r

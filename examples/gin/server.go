@@ -7,7 +7,8 @@ import (
 	"os"
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
-	"github.com/Microsoft/ApplicationInsights-Go/appinsights/aicollect"
+	"github.com/Microsoft/ApplicationInsights-Go/appinsights/autocollection"
+	aigin "github.com/Microsoft/ApplicationInsights-Go/appinsights/autocollection/gin"
 	"github.com/gin-gonic/gin"
 )
 
@@ -21,7 +22,7 @@ func main() {
 	}
 
 	telemetryClient.Context().CommonProperties["http_framework"] = "gin"
-	aicollect.InstrumentDefaultHTTPClient(telemetryClient)
+	autocollection.InstrumentDefaultHTTPClient(telemetryClient)
 	appinsights.NewDiagnosticsMessageListener(func(msg string) error {
 		log.Println(msg)
 		return nil
@@ -29,7 +30,7 @@ func main() {
 
 	// Gin setup
 	router := gin.Default()
-	router.Use(Middleware(telemetryClient))
+	router.Use(aigin.Middleware(telemetryClient))
 
 	router.GET("/", IndexHandler)
 	router.GET("/panic", PanicHandler)
