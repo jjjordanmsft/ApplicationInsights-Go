@@ -84,8 +84,9 @@ func (context *TelemetryContext) envelop(item Telemetry) *contracts.Envelope {
 		}
 	}
 
-	// Create operation ID if it does not exist
-	if _, ok := envelope.Tags[contracts.OperationId]; !ok {
+	// Create operation ID if it does not exist -- unless it's telemetry that can't
+	// be sampled, since it really doesn't matter in those cases.
+	if _, ok := envelope.Tags[contracts.OperationId]; !ok && item.CanSample() {
 		envelope.Tags[contracts.OperationId] = uuid.NewV4().String()
 	}
 

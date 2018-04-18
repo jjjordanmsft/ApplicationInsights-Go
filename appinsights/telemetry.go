@@ -40,6 +40,9 @@ type Telemetry interface {
 
 	// Gets custom measurements to submit with the telemetry item.
 	GetMeasurements() map[string]float64
+
+	// Gets whether this telemetry type can be sampled.
+	CanSample() bool
 }
 
 // BaseTelemetry is the common base struct for telemetry items.
@@ -85,6 +88,12 @@ func (item *BaseTelemetry) ContextTags() map[string]string {
 // Gets custom properties to submit with the telemetry item.
 func (item *BaseTelemetry) GetProperties() map[string]string {
 	return item.Properties
+}
+
+// Gets whether this telemetry type can be sampled.
+func (item *BaseTelemetry) CanSample() bool {
+	// Most telemetry types can be sampled -- those that cannot are the exception.
+	return true
 }
 
 // Gets custom measurements to submit with the telemetry item.
@@ -203,6 +212,11 @@ func (metric *MetricTelemetry) TelemetryData() TelemetryData {
 	data.Properties = metric.Properties
 
 	return data
+}
+
+func (_ *MetricTelemetry) CanSample() bool {
+	// Metric data cannot be sampled.
+	return false
 }
 
 // Aggregated metric telemetry items represent an aggregation of data points
@@ -345,6 +359,11 @@ func (agg *AggregateMetricTelemetry) TelemetryData() TelemetryData {
 	data.Properties = agg.Properties
 
 	return data
+}
+
+func (_ *AggregateMetricTelemetry) CanSample() bool {
+	// Metric data cannot be sampled.
+	return false
 }
 
 // Request telemetry items represents completion of an external request to the

@@ -35,6 +35,13 @@ type TelemetryClient interface {
 	// is silently swallowed by the client. Defaults to enabled.
 	SetIsEnabled(enabled bool)
 
+	// GetSamplingPercentage gets the current sampling percentage for the
+	// client.
+	GetSamplingPercentage() float64
+
+	// SetSamplingPercentage sets the sampling percentage for the client.
+	SetSamplingPercentage(samplingPercentage float64)
+
 	// Submits the specified telemetry item.
 	Track(telemetry Telemetry)
 
@@ -71,6 +78,7 @@ type telemetryClient struct {
 	context   *TelemetryContext
 	config    *TelemetryConfiguration
 	cid       string
+	sampling  float64
 	isEnabled bool
 }
 
@@ -93,6 +101,7 @@ func NewTelemetryClientFromConfig(config *TelemetryConfiguration) TelemetryClien
 		context:   context,
 		config:    config,
 		isEnabled: true,
+		sampling:  100.0,
 	}
 
 	client.cid = correlationIdPrefix
@@ -141,10 +150,24 @@ func (tc *telemetryClient) SetIsEnabled(isEnabled bool) {
 	tc.isEnabled = isEnabled
 }
 
+// GetSamplingPercentage gets the current sampling percentage for the client.
+func (tc *telemetryClient) GetSamplingPercentage() float64 {
+	return tc.sampling
+}
+
+// SetSamplingPercentage sets the sampling percentage for the client.
+func (tc *telemetryClient) SetSamplingPercentage(samplingPercentage float64) {
+	tc.sampling = samplingPercentage
+}
+
 // Submits the specified telemetry item.
 func (tc *telemetryClient) Track(item Telemetry) {
 	if tc.isEnabled && item != nil {
-		tc.channel.Send(tc.context.envelop(item))
+		envelope := tc.context.envelop(item)
+		oid := envelope.Tags[contracts.OperationId]
+		if !item.CanSample() || tc.sampling >= 100.0 || OperationId(oid).Hash() < tc.sampling {
+			tc.channel.Send(envelope)
+		}
 	}
 }
 

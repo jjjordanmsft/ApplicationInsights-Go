@@ -25,6 +25,10 @@ func NewOperationId() OperationId {
 	return OperationId("|" + uuid.NewV4().String() + ".")
 }
 
+func (id OperationId) String() string {
+	return string(id)
+}
+
 func (id OperationId) GetRoot() OperationId {
 	idstr := string(id)
 	end := strings.IndexByte(idstr, '.')
@@ -32,7 +36,7 @@ func (id OperationId) GetRoot() OperationId {
 		end = len(idstr)
 	}
 
-	if idstr[0] == '|' {
+	if len(idstr) > 0 && idstr[0] == '|' {
 		return OperationId(idstr[1:end])
 	} else {
 		return OperationId(idstr[:end])
@@ -61,7 +65,7 @@ func (id OperationId) AppendSuffix(suffix, delimiter string) OperationId {
 		return NewOperationId()
 	}
 
-	return OperationId(fmt.Sprintf("%s%08ux#", idstr[:x], rand.Uint32()))
+	return OperationId(fmt.Sprintf("%s%08x#", idstr[:x], rand.Uint32()))
 }
 
 func (id OperationId) GenerateRequestId() OperationId {
@@ -87,7 +91,7 @@ func (id OperationId) Hash() float64 {
 	}
 
 	for len(idstr) < 8 {
-		id += id
+		idstr += idstr
 	}
 
 	// djb2, with + not ^

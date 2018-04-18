@@ -36,6 +36,7 @@ func NewOperation(client TelemetryClient, correlation *CorrelationContext) Opera
 			context:   context,
 			config:    client.Config(),
 			isEnabled: true,
+			sampling:  client.GetSamplingPercentage(),
 		},
 	}
 }
