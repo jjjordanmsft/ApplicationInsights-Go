@@ -7,11 +7,11 @@ import (
 	"testing"
 )
 
+// uuid's are always lower-case.
 const newIdPattern = `^\|([0-9a-f]{8})(-[0-9a-f]{4}){3}(-[0-9a-f]{12})\.`
 
 func TestNewOperationId(t *testing.T) {
 	id := NewOperationId()
-	// uuid's are always lower-case.
 	match, err := regexp.MatchString(newIdPattern, string(id))
 	if !match || err != nil {
 		t.Error("OperationID doesn't match")
@@ -48,28 +48,24 @@ type appendSuffixTestCase struct {
 	suffix    string
 	delimiter string
 	result    string
-	pattern   bool
 }
 
 func TestOperationIdAppendSuffix(t *testing.T) {
 	xs := strings.Repeat("x", 2048)
 
 	testCases := []appendSuffixTestCase{
-		appendSuffixTestCase{"a", "b", "c", "abc", false},
-		appendSuffixTestCase{xs[:1022], "b", "c", xs[:1022] + "bc", false},
-		appendSuffixTestCase{xs[:1023], "b", "c", newIdPattern, true},
-		appendSuffixTestCase{xs, "a", "b", newIdPattern, true},
-		appendSuffixTestCase{xs[:512] + "." + xs + "_", "b", "_", `x{512}\.[0-9a-f]{8}#`, true},
+		appendSuffixTestCase{"a", "b", "c", "abc"},
+		appendSuffixTestCase{xs[:1022], "b", "c", "x{1000}x{22}bc"},
+		appendSuffixTestCase{xs[:1023], "b", "c", newIdPattern},
+		appendSuffixTestCase{xs, "a", "b", newIdPattern},
+		appendSuffixTestCase{xs[:512] + "." + xs + "_", "b", "_", `x{512}\.[0-9a-f]{8}#`},
+		appendSuffixTestCase{xs[:1004] + ".a.b.c.d.e.f.g.h.i.j.k.l", "Y", "_", `x{1000}x{4}\.a\.b\.c\.d\.e\.[0-9a-f]{8}#`},
 	}
 
 	for _, testCase := range testCases {
 		result := OperationId(testCase.id).AppendSuffix(testCase.suffix, testCase.delimiter).String()
-		if testCase.pattern {
-			if match, err := regexp.MatchString(testCase.result, result); !match || err != nil {
-				t.Errorf(`"%s".AppendSuffix("%s", "%s") == "%s" doesn't match pattern %s`, testCase.id, testCase.suffix, testCase.delimiter, result, testCase.result)
-			}
-		} else if result != testCase.result {
-			t.Errorf(`"%s".AppendSuffix("%s", "%s") == %s != %s`, testCase.id, testCase.suffix, testCase.delimiter, result, testCase.result)
+		if match, err := regexp.MatchString("^" + testCase.result + "$", result); !match || err != nil {
+			t.Errorf(`"%s".AppendSuffix("%s", "%s") == "%s" doesn't match pattern %s`, testCase.id, testCase.suffix, testCase.delimiter, result, testCase.result)
 		}
 	}
 }
@@ -90,7 +86,7 @@ func TestOperationIdGenerateRequestId(t *testing.T) {
 
 	for _, testCase := range testCases {
 		result := OperationId(testCase.id).GenerateRequestId().String()
-		if match, err := regexp.MatchString(testCase.result, result); !match || err != nil {
+		if match, err := regexp.MatchString("^" + testCase.result + "$", result); !match || err != nil {
 			t.Errorf(`"%s".GenerateRequestId() == %s doesn't match %s`, testCase.id, result, testCase.result)
 		}
 	}
