@@ -16,18 +16,31 @@ const (
 	correlationIdPrefix  = "cid-v1:"
 )
 
+// cidLookup is the interface for the CID lookup implementation (allowing it to be mocked out)
 type cidLookup interface {
+	// Query looks up the specified instrumentation key's correlation ID from the specified endpoint,
+	// and invokes callback with the result when it is available.
 	Query(baseUri, ikey string, callback correlationCallback)
 }
 
+// correlationCallback is the function signature for receiving callbacks
+type correlationCallback func(*correlationResult)
+
+// correlationResult encapsulates the CID lookup response
+type correlationResult struct {
+	correlationId string
+	err           error
+}
+
+// correlationIdManager Tracks pending and completed CID requests and maintains a cache of responses.
 type correlationIdManager struct {
 	lock    sync.Mutex
 	pending map[string]*correlationLookup
 	results map[string]*correlationResult
 }
 
-type correlationCallback func(*correlationResult)
-
+// correlationLookup represents an active CID lookup and tracks which callbacks must be invoked when
+// the response is returned.
 type correlationLookup struct {
 	ikey      string
 	id        string
@@ -35,17 +48,14 @@ type correlationLookup struct {
 	callbacks []correlationCallback
 }
 
-type correlationResult struct {
-	correlationId string
-	err           error
-}
-
+// correlationManager is the singleton correlationIdManager that globally tracks all lookups for this process.
 var correlationManager cidLookup
 
 func init() {
 	correlationManager = newCorrelationIdManager()
 }
 
+// newCorrelationIdManager creates a new, empty correlationIdManager.
 func newCorrelationIdManager() *correlationIdManager {
 	return &correlationIdManager{
 		pending: make(map[string]*correlationLookup),
@@ -53,6 +63,8 @@ func newCorrelationIdManager() *correlationIdManager {
 	}
 }
 
+// Query looks up the specified instrumentation key's correlation ID from the specified endpoint,
+// and invokes callback with the result when it is available.
 func (manager *correlationIdManager) Query(baseUri, ikey string, callback correlationCallback) {
 	baseUrl, err := url.Parse(baseUri)
 	if err != nil {
@@ -86,6 +98,7 @@ func (manager *correlationIdManager) Query(baseUri, ikey string, callback correl
 	}
 }
 
+// lookup is the background cid lookup routine that processes retries.
 func (manager *correlationIdManager) lookup(lookup *correlationLookup) {
 	diagnosticsWriter.Printf("Looking up correlation ID for %s", lookup.ikey)
 
@@ -97,7 +110,7 @@ func (manager *correlationIdManager) lookup(lookup *correlationLookup) {
 			return
 		} else if retry {
 			lastError = err
-			time.Sleep(correlationRetryWait)
+			currentClock.Sleep(correlationRetryWait)
 		} else {
 			lastError = err
 			break
@@ -107,6 +120,8 @@ func (manager *correlationIdManager) lookup(lookup *correlationLookup) {
 	manager.postResult(lookup, "", lastError)
 }
 
+// postResult updates the correlationIdManager's internal tables and invokes all
+// callbacks when a CID result is received.
 func (manager *correlationIdManager) postResult(lookup *correlationLookup, correlationId string, err error) {
 	if err != nil {
 		diagnosticsWriter.Printf("Failed to lookup correlation ID for %s: %s", lookup.ikey, err.Error())
@@ -134,6 +149,7 @@ func (manager *correlationIdManager) postResult(lookup *correlationLookup, corre
 	}
 }
 
+// tryLookupCorrelationId performs the network request for the correlation ID.
 func tryLookupCorrelationId(url string) (string, bool, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -149,9 +165,10 @@ func tryLookupCorrelationId(url string) (string, bool, error) {
 	}
 
 	defer resp.Body.Close()
-	if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+	if resp.StatusCode != 200 {
 		// Bad key? Don't retry.
-		return "", false, fmt.Errorf("Received status code %d from server", resp.StatusCode)
+		retry := (resp.StatusCode < 400 || resp.StatusCode >= 500)
+		return "", retry, fmt.Errorf("Received status code %d from server", resp.StatusCode)
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)

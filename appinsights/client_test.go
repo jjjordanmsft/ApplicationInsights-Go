@@ -20,6 +20,9 @@ func BenchmarkClientBurstPerformance(b *testing.B) {
 }
 
 func TestClientProperties(t *testing.T) {
+	mockCidLookup(map[string]string{test_ikey: "test_correlation_id"})
+	defer resetCidLookup()
+
 	client := NewTelemetryClient(test_ikey)
 	defer client.Channel().Close()
 
@@ -51,18 +54,28 @@ func TestClientProperties(t *testing.T) {
 	if client.Channel().EndpointAddress() != "https://dc.services.visualstudio.com/v2/track" {
 		t.Error("Client.Channel.EndpointAddress was incorrect")
 	}
+
+	if client.CorrelationId() != "cid-v1:test_correlation_id" {
+		t.Error("Client.CorrelationId was incorrect")
+	}
 }
 
 func TestEndToEnd(t *testing.T) {
 	mockClock(time.Unix(1511001321, 0))
 	defer resetClock()
+	resetCidLookup()
 	xmit, server := newTestClientServer()
 	defer server.Close()
 
 	config := NewTelemetryConfiguration(test_ikey)
 	config.EndpointUrl = xmit.(*httpTransmitter).endpoint
+	cidServer := useCidServer(config, map[string]string{test_ikey: "test_cid"})
+	defer cidServer.Close()
 	client := NewTelemetryClientFromConfig(config)
 	defer client.Channel().Close()
+
+	// Ensure cid lookup takes place
+	cidServer.waitForRequest(t)
 
 	// Track directly off the client
 	client.TrackEvent("client-event")

@@ -64,7 +64,7 @@ func TestOperationIdAppendSuffix(t *testing.T) {
 
 	for _, testCase := range testCases {
 		result := OperationId(testCase.id).AppendSuffix(testCase.suffix, testCase.delimiter).String()
-		if match, err := regexp.MatchString("^" + testCase.result + "$", result); !match || err != nil {
+		if match, err := regexp.MatchString("^"+testCase.result+"$", result); !match || err != nil {
 			t.Errorf(`"%s".AppendSuffix("%s", "%s") == "%s" doesn't match pattern %s`, testCase.id, testCase.suffix, testCase.delimiter, result, testCase.result)
 		}
 	}
@@ -86,7 +86,7 @@ func TestOperationIdGenerateRequestId(t *testing.T) {
 
 	for _, testCase := range testCases {
 		result := OperationId(testCase.id).GenerateRequestId().String()
-		if match, err := regexp.MatchString("^" + testCase.result + "$", result); !match || err != nil {
+		if match, err := regexp.MatchString("^"+testCase.result+"$", result); !match || err != nil {
 			t.Errorf(`"%s".GenerateRequestId() == %s doesn't match %s`, testCase.id, result, testCase.result)
 		}
 	}
