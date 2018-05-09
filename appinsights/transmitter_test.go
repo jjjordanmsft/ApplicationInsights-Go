@@ -60,6 +60,22 @@ func (server *testServer) waitForRequest(t *testing.T) *testRequest {
 	}
 }
 
+func (request *testRequest) getPayload() (result []byte, err error) {
+	if len(request.body) < 2 || request.body[0] != 0x1f || request.body[1] != 0x8b {
+		err = fmt.Errorf("Missing gzip magic number")
+		return
+	}
+
+	reader, err := gzip.NewReader(bytes.NewReader(request.body))
+	if err != nil {
+		return
+	}
+
+	result, err = ioutil.ReadAll(reader)
+	reader.Close()
+	return
+}
+
 type nullTransmitter struct{}
 
 func (transmitter *nullTransmitter) Transmit(payload []byte, items telemetryBufferItems) (*transmissionResult, error) {

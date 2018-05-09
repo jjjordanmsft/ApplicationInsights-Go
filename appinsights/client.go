@@ -166,6 +166,7 @@ func (tc *telemetryClient) Track(item Telemetry) {
 		envelope := tc.context.envelop(item)
 		oid := envelope.Tags[contracts.OperationId]
 		if !item.CanSample() || tc.sampling >= 100.0 || OperationId(oid).Hash() < tc.sampling {
+			envelope.SampleRate = tc.sampling
 			tc.channel.Send(envelope)
 		}
 	}

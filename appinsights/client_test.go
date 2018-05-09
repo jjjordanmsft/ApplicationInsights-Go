@@ -1,9 +1,6 @@
 package appinsights
 
 import (
-	"bytes"
-	"compress/gzip"
-	"io/ioutil"
 	"testing"
 	"time"
 )
@@ -58,12 +55,21 @@ func TestClientProperties(t *testing.T) {
 	if client.CorrelationId() != "cid-v1:test_correlation_id" {
 		t.Error("Client.CorrelationId was incorrect")
 	}
+
+	if client.GetSamplingPercentage() != 100.0 {
+		t.Error("Default sampling percentage should be 100")
+	}
+
+	client.SetSamplingPercentage(34.0)
+	if client.GetSamplingPercentage() != 34.0 {
+		t.Error("Sampling percentage should be modified by SetSamplingPercentage")
+	}
 }
 
 func TestEndToEnd(t *testing.T) {
 	mockClock(time.Unix(1511001321, 0))
 	defer resetClock()
-	resetCidLookup()
+	defer resetCidLookup()
 	xmit, server := newTestClientServer()
 	defer server.Close()
 
@@ -94,22 +100,9 @@ func TestEndToEnd(t *testing.T) {
 	slowTick(11)
 	req := server.waitForRequest(t)
 
-	// GZIP magic number
-	if len(req.body) < 2 || req.body[0] != 0x1f || req.body[1] != 0x8b {
-		t.Fatal("Missing gzip magic number")
-	}
-
-	// Decompress
-	reader, err := gzip.NewReader(bytes.NewReader(req.body))
+	body, err := req.getPayload()
 	if err != nil {
-		t.Fatalf("Coudln't create gzip reader: %s", err.Error())
-	}
-
-	// Read payload
-	body, err := ioutil.ReadAll(reader)
-	reader.Close()
-	if err != nil {
-		t.Fatalf("Couldn't read compressed data: %s", err.Error())
+		t.Fatal(err.Error())
 	}
 
 	// Check out payload
@@ -137,4 +130,49 @@ func TestEndToEnd(t *testing.T) {
 	j[3].assertPath(t, "iKey", test_ikey)
 	j[3].assertPath(t, "name", "Microsoft.ApplicationInsights.Request")
 	j[3].assertPath(t, "time", "2017-11-18T10:34:21Z")
+}
+
+func TestSampling(t *testing.T) {
+	mockClock()
+	defer resetClock()
+	mockCidLookup(nil)
+	defer resetCidLookup()
+	xmit, server := newTestClientServer()
+	defer server.Close()
+
+	config := NewTelemetryConfiguration(test_ikey)
+	config.EndpointUrl = xmit.(*httpTransmitter).endpoint
+	client := NewTelemetryClientFromConfig(config)
+	defer client.Channel().Close()
+
+	// Set sampling to 60%, 1000 events, 0.01 tolerance
+	pct := 60.0
+	count := 1000
+	tolerance := 0.1
+	expected := (pct / 100.0) * float64(count)
+
+	// Send events
+	client.SetSamplingPercentage(pct)
+	for i := 0; i < count; i++ {
+		client.TrackEvent("Sample test")
+	}
+
+	// Read out of transmitter
+	client.Channel().Flush()
+	req := server.waitForRequest(t)
+	body, err := req.getPayload()
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	// Check count
+	j, err := parsePayload(body)
+	if float64(len(j)) < (expected*(1-tolerance)) || float64(len(j)) > (expected*(1+tolerance)) {
+		t.Errorf("Sent %d messages, and received %d which is outside of the expected tolerance of %f", count, len(j), tolerance)
+	}
+
+	// Make sure sampling percentage is set on each message.
+	for _, root := range j {
+		root.assertPath(t, "sampleRate", pct)
+	}
 }
