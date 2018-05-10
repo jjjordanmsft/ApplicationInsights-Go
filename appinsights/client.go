@@ -25,7 +25,9 @@ type TelemetryClient interface {
 	// Gets the telemetry channel used to submit data to the backend.
 	Channel() TelemetryChannel
 
-	// Gets the correlation ID for this application
+	// CorrelationId returns the unique ID used to represent this application
+	// when correlating operations across services.  This is fetched from
+	// Application Insights servers using the instrumentation key.
 	CorrelationId() string
 
 	// Gets whether this client is enabled and will accept telemetry.
@@ -119,6 +121,9 @@ func (tc *telemetryClient) Config() *TelemetryConfiguration {
 	return tc.config
 }
 
+// CorrelationId returns the unique ID used to represent this application
+// when correlating operations across services.  This is fetched from
+// Application Insights servers using the instrumentation key.
 func (tc *telemetryClient) CorrelationId() string {
 	return tc.cid
 }

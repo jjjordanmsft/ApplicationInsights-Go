@@ -52,11 +52,7 @@ func TestJsonSerializerEvents(t *testing.T) {
 	view.Duration = 4 * time.Minute
 	buffer.add(view)
 
-	j, err := parsePayload(buffer.serialize())
-	if err != nil {
-		t.Errorf("Error parsing payload: %s", err.Error())
-	}
-
+	j := parsePayload(t, buffer.serialize())
 	if len(j) != 8 {
 		t.Fatal("Unexpected event count")
 	}
@@ -224,10 +220,7 @@ func TestJsonSerializerNakedEvents(t *testing.T) {
 		},
 	)
 
-	j, err := parsePayload(buffer.serialize())
-	if err != nil {
-		t.Errorf("Error parsing payload: %s", err.Error())
-	}
+	j := parsePayload(t, buffer.serialize())
 
 	if len(j) != 8 {
 		t.Fatal("Unexpected event count")
@@ -363,7 +356,7 @@ func (buffer *telemetryBufferItems) add(items ...Telemetry) {
 type jsonMessage map[string]interface{}
 type jsonPayload []jsonMessage
 
-func parsePayload(payload []byte) (jsonPayload, error) {
+func parsePayload(t *testing.T, payload []byte) jsonPayload {
 	// json.Decoder can detect line endings for us but I'd like to explicitly find them.
 	var result jsonPayload
 	for _, item := range bytes.Split(payload, []byte("\n")) {
@@ -376,11 +369,12 @@ func parsePayload(payload []byte) (jsonPayload, error) {
 		if err := decoder.Decode(&msg); err == nil {
 			result = append(result, msg)
 		} else {
-			return result, err
+			t.Fatalf("Failed to parse JSON payload: %s", err.Error())
+			return nil
 		}
 	}
 
-	return result, nil
+	return result
 }
 
 func (msg jsonMessage) assertPath(t *testing.T, path string, value interface{}) {
@@ -437,9 +431,35 @@ func (msg jsonMessage) assertPath(t *testing.T, path string, value interface{}) 
 }
 
 func (msg jsonMessage) getPath(path string) (interface{}, error) {
-	parts := strings.Split(path, ".")
 	var obj interface{} = msg
-	for i, part := range parts {
+	var rest string
+	remaining := path
+	for ; len(remaining) > 0; remaining = rest {
+		var part string
+		if remaining[0] == '\'' {
+			tick := strings.IndexByte(remaining[1:], '\'')
+			if tick < 0 {
+				return nil, fmt.Errorf("Malformed path string (unmatched quote): %s", path)
+			}
+
+			part = remaining[1 : tick+1]
+			rest = remaining[tick+2:]
+			if len(rest) > 0 && rest[0] == '.' {
+				rest = rest[1:]
+			}
+		} else {
+			dot := strings.IndexByte(remaining, '.')
+			if dot < 0 {
+				part = remaining
+				rest = ""
+			} else {
+				part = remaining[:dot]
+				rest = remaining[dot+1:]
+			}
+		}
+
+		thisPath := path[:len(path)-len(rest)]
+
 		if strings.HasPrefix(part, "[") && strings.HasSuffix(part, "]") {
 			// Array
 			idxstr := part[1 : len(part)-2]
@@ -447,12 +467,12 @@ func (msg jsonMessage) getPath(path string) (interface{}, error) {
 
 			if ar, ok := obj.([]interface{}); ok {
 				if idx >= len(ar) {
-					return nil, fmt.Errorf("Index out of bounds: %s", strings.Join(parts[0:i+1], "."))
+					return nil, fmt.Errorf("Index out of bounds: %s", thisPath)
 				}
 
 				obj = ar[idx]
 			} else {
-				return nil, fmt.Errorf("Path %s is not an array", strings.Join(parts[0:i], "."))
+				return nil, fmt.Errorf("Path %s is not an array", thisPath)
 			}
 		} else if part == "<len>" {
 			if ar, ok := obj.([]interface{}); ok {
@@ -464,16 +484,16 @@ func (msg jsonMessage) getPath(path string) (interface{}, error) {
 				if val, ok := dict[part]; ok {
 					obj = val
 				} else {
-					return nil, fmt.Errorf("Key %s not found in %s", part, strings.Join(parts[0:i], "."))
+					return nil, fmt.Errorf("Key %s not found in %s", part, thisPath)
 				}
 			} else if dict, ok := obj.(map[string]interface{}); ok {
 				if val, ok := dict[part]; ok {
 					obj = val
 				} else {
-					return nil, fmt.Errorf("Key %s not found in %s", part, strings.Join(parts[0:i], "."))
+					return nil, fmt.Errorf("Key %s not found in %s", part, thisPath)
 				}
 			} else {
-				return nil, fmt.Errorf("Path %s is not a map", strings.Join(parts[0:i], "."))
+				return nil, fmt.Errorf("Path %s is not a map", thisPath)
 			}
 		}
 	}

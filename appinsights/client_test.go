@@ -1,8 +1,11 @@
 package appinsights
 
 import (
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/Microsoft/ApplicationInsights-Go/appinsights/contracts"
 )
 
 func BenchmarkClientBurstPerformance(b *testing.B) {
@@ -106,11 +109,7 @@ func TestEndToEnd(t *testing.T) {
 	}
 
 	// Check out payload
-	j, err := parsePayload(body)
-	if err != nil {
-		t.Errorf("Error parsing payload: %s", err.Error())
-	}
-
+	j := parsePayload(t, body)
 	if len(j) != 4 {
 		t.Fatal("Unexpected event count")
 	}
@@ -133,17 +132,9 @@ func TestEndToEnd(t *testing.T) {
 }
 
 func TestSampling(t *testing.T) {
-	mockClock()
-	defer resetClock()
 	mockCidLookup(nil)
 	defer resetCidLookup()
-	xmit, server := newTestClientServer()
-	defer server.Close()
-
-	config := NewTelemetryConfiguration(test_ikey)
-	config.EndpointUrl = xmit.(*httpTransmitter).endpoint
-	client := NewTelemetryClientFromConfig(config)
-	defer client.Channel().Close()
+	channel, client := newMockChannelClient(nil)
 
 	// Set sampling to 60%, 1000 events, 0.01 tolerance
 	pct := 60.0
@@ -157,22 +148,60 @@ func TestSampling(t *testing.T) {
 		client.TrackEvent("Sample test")
 	}
 
-	// Read out of transmitter
-	client.Channel().Flush()
-	req := server.waitForRequest(t)
-	body, err := req.getPayload()
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-
 	// Check count
-	j, err := parsePayload(body)
-	if float64(len(j)) < (expected*(1-tolerance)) || float64(len(j)) > (expected*(1+tolerance)) {
-		t.Errorf("Sent %d messages, and received %d which is outside of the expected tolerance of %f", count, len(j), tolerance)
+	if float64(len(channel.items)) < (expected*(1-tolerance)) || float64(len(channel.items)) > (expected*(1+tolerance)) {
+		t.Errorf("Sent %d messages, and received %d which is outside of the expected tolerance of %f", count, len(channel.items), tolerance)
 	}
 
 	// Make sure sampling percentage is set on each message.
-	for _, root := range j {
-		root.assertPath(t, "sampleRate", pct)
+	for _, item := range channel.items {
+		if item.SampleRate != pct {
+			t.Errorf("Unexpected sample rate value: %v", item.SampleRate)
+		}
 	}
+}
+
+// Test helpers -----
+
+func newMockChannelClient(config *TelemetryConfiguration) (*mockChannel, TelemetryClient) {
+	if config == nil {
+		config = NewTelemetryConfiguration(test_ikey)
+	}
+
+	channel := &mockChannel{}
+	tc := NewTelemetryClientFromConfig(config).(*telemetryClient)
+	tc.channel.Close()
+	tc.channel = channel
+	return channel, tc
+}
+
+type mockChannel struct {
+	sync.Mutex
+	items telemetryBufferItems
+}
+
+func (ch *mockChannel) Send(item *contracts.Envelope) {
+	ch.Lock()
+	defer ch.Unlock()
+	ch.items = append(ch.items, item)
+}
+
+func (ch *mockChannel) EndpointAddress() string {
+	return ""
+}
+
+func (ch *mockChannel) Stop() {
+}
+
+func (ch *mockChannel) Flush() {
+}
+
+func (ch *mockChannel) IsThrottled() bool {
+	return false
+}
+
+func (ch *mockChannel) Close(retryTimeout ...time.Duration) <-chan struct{} {
+	result := make(chan struct{})
+	close(result)
+	return result
 }
