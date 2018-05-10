@@ -13,7 +13,7 @@ import (
 
 // Common interface implemented by telemetry data contracts
 type TelemetryData interface {
-	EnvelopeName() string
+	EnvelopeName(string) string
 	BaseType() string
 	Sanitize() []string
 }
@@ -424,10 +424,19 @@ func NewRequestTelemetry(method, uri string, duration time.Duration, responseCod
 		nameUri = parsedUrl.String()
 	}
 
+	// We probably shouldn't crash if we can't get a UUID.  Just emit a warning, and set it to blank.
+	// The telemetry will be rejected, but there will be plenty of logging about that.
+	var id string
+	if requestId, err := uuid.NewV4(); err != nil {
+		diagnosticsWriter.Printf("Failed to generate request ID: %s", err.Error())
+	} else {
+		id = requestId.String()
+	}
+
 	return &RequestTelemetry{
 		Name:         fmt.Sprintf("%s %s", method, nameUri),
 		Url:          uri,
-		Id:           uuid.NewV4().String(),
+		Id:           id,
 		Duration:     duration,
 		ResponseCode: responseCode,
 		Success:      success,
@@ -459,7 +468,11 @@ func (request *RequestTelemetry) TelemetryData() TelemetryData {
 	data.Source = request.Source
 
 	if request.Id == "" {
-		data.Id = uuid.NewV4().String()
+		if id, err := uuid.NewV4(); err != nil {
+			diagnosticsWriter.Printf("Failed to generate request ID: %s", err.Error())
+		} else {
+			data.Id = id.String()
+		}
 	} else {
 		data.Id = request.Id
 	}

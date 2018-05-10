@@ -69,7 +69,7 @@ func main() {
 	rem2.ResultCode = "200"
 	rem2.Duration = time.Minute
 	rem2.Data = "searched"
-	rem2.Id = uuid.NewV4().String()
+	rem2.Id = uuid.Must(uuid.NewV4()).String()
 	client.Track(rem2)
 	
 	// Availability

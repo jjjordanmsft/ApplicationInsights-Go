@@ -26,7 +26,7 @@ type OperationId string
 
 // NewOperationId creates a new, random Operation ID.
 func NewOperationId() OperationId {
-	return OperationId("|" + uuid.NewV4().String() + ".")
+	return OperationId("|" + uuid.Must(uuid.NewV4()).String() + ".")
 }
 
 // String returns the OperationId as a string

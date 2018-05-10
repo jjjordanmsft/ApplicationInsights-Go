@@ -138,7 +138,7 @@ func TestTimestamp(t *testing.T) {
 	ev := NewEventTelemetry("event")
 	ev.Timestamp = time.Unix(1523667421, 500000000)
 
-	envelope := NewTelemetryContext("").envelop(ev)
+	envelope := NewTelemetryContext(test_ikey).envelop(ev)
 	if envelope.Time != "2018-04-14T00:57:01.5Z" {
 		t.Errorf("Unexpected timestamp: %s", envelope.Time)
 	}

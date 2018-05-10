@@ -1,6 +1,7 @@
 package appinsights
 
 import (
+	"strings"
 	"time"
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights/contracts"
@@ -13,6 +14,9 @@ import (
 type TelemetryContext struct {
 	// Instrumentation key
 	iKey string
+
+	// Stripped-down instrumentation key used in envelope name
+	nameIKey string
 
 	// Collection of tag data to attach to the telemetry item.
 	Tags contracts.ContextTags
@@ -27,6 +31,7 @@ type TelemetryContext struct {
 func NewTelemetryContext(ikey string) *TelemetryContext {
 	return &TelemetryContext{
 		iKey:             ikey,
+		nameIKey:         strings.Replace(ikey, "-", "", -1),
 		Tags:             make(contracts.ContextTags),
 		CommonProperties: make(map[string]string),
 	}
@@ -56,7 +61,7 @@ func (context *TelemetryContext) envelop(item Telemetry) *contracts.Envelope {
 	data.BaseData = tdata
 
 	envelope := contracts.NewEnvelope()
-	envelope.Name = tdata.EnvelopeName()
+	envelope.Name = tdata.EnvelopeName(context.nameIKey)
 	envelope.Data = data
 	envelope.IKey = context.iKey
 
@@ -87,7 +92,9 @@ func (context *TelemetryContext) envelop(item Telemetry) *contracts.Envelope {
 	// Create operation ID if it does not exist -- unless it's telemetry that can't
 	// be sampled, since it really doesn't matter in those cases.
 	if _, ok := envelope.Tags[contracts.OperationId]; !ok && item.CanSample() {
-		envelope.Tags[contracts.OperationId] = uuid.NewV4().String()
+		if oid, err := uuid.NewV4(); err == nil {
+			envelope.Tags[contracts.OperationId] = oid.String()
+		}
 	}
 
 	// Sanitize.
