@@ -24,10 +24,14 @@ const (
 	correlationIdPrefix = "cid-v1:" // TODO: Deduplicate
 )
 
+// InstrumentDefaultHTTPClient installs a remote dependency tracker in
+// http.DefaultClient.
 func InstrumentDefaultHTTPClient(client appinsights.TelemetryClient) {
 	http.DefaultClient = NewHTTPClient(http.DefaultClient, client)
 }
 
+// NewHTTPClient wraps the input http.Client and tracks remote dependencies to
+// the specified TelemetryClient.
 func NewHTTPClient(httpClient *http.Client, aiClient appinsights.TelemetryClient) *http.Client {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
@@ -38,6 +42,8 @@ func NewHTTPClient(httpClient *http.Client, aiClient appinsights.TelemetryClient
 	return &result
 }
 
+// NewHTTPTransport wraps the input http.RoundTripper and tracks remote
+// dependencies to the specified TelemetryClient.
 func NewHTTPTransport(transport http.RoundTripper, aiClient appinsights.TelemetryClient) http.RoundTripper {
 	if transport == nil {
 		transport = http.DefaultTransport

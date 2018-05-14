@@ -458,6 +458,12 @@ func (request *RequestTelemetry) MarkTime(startTime, endTime time.Time) {
 	request.Duration = endTime.Sub(startTime)
 }
 
+// SetResponseCode sets the ResponseCode and Success fields based on the status code.
+func (request *RequestTelemetry) SetResponseCode(code int) {
+	request.ResponseCode = strconv.Itoa(code)
+	request.Success = code < 400 || code == 401
+}
+
 func (request *RequestTelemetry) TelemetryData() TelemetryData {
 	data := contracts.NewRequestData()
 	data.Name = request.Name

@@ -1,9 +1,6 @@
 package gin
 
 import (
-	"net/http"
-	"strconv"
-
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights/autocollection"
 	"github.com/gin-gonic/gin"
@@ -12,15 +9,14 @@ import (
 func Middleware(telemetryClient appinsights.TelemetryClient) gin.HandlerFunc {
 	middleware := autocollection.NewHTTPMiddleware(telemetryClient)
 	return func(c *gin.Context) {
-		middleware.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-			c.Request = r
-			c.Next()
+		request, telem, operation := middleware.BeginRequest(c.Request)
+		for k, v := range middleware.GetCorrelationHeaders(c.Request, operation) {
+			c.Writer.Header().Set(k, v)
+		}
 
-			// Replace code - since Context.Status() goes around it
-			code := c.Writer.Status()
-			telem := appinsights.RequestTelemetryFromContext(c.Request.Context())
-			telem.ResponseCode = strconv.Itoa(code)
-			telem.Success = code < 400 || code == 401
-		})(c.Writer, c.Request)
+		defer middleware.CompleteRequest(telem, operation)
+		c.Request = request
+		c.Next()
+		telem.SetResponseCode(c.Writer.Status())
 	}
 }

@@ -117,12 +117,14 @@ func (headers *correlationResponseHeaders) getCorrelatedTarget(uri *url.URL) str
 }
 
 // writeCorrelationResponseHeaders writes correlation headers to responses
-func writeCorrelationResponseHeaders(rw http.ResponseWriter, operation appinsights.Operation) {
+func getCorrelationResponseHeaders(operation appinsights.Operation) map[string]string {
 	properties := make(appinsights.CorrelationProperties)
 	properties[requestContextTargetKey] = operation.CorrelationId()
 	properties[requestContextTargetRoleNameKey] = operation.Context().Tags[contracts.CloudRole]
 
-	rw.Header().Set(requestContextHeader, properties.Serialize())
+	return map[string]string{
+		requestContextHeader: properties.Serialize(),
+	}
 }
 
 // Gets a monotonically increasing integer used for generating unique request ids.

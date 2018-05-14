@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 cd $(dirname $0)
 for d in basic buffalo gin goji martini negroni nethttp

@@ -2,7 +2,6 @@ package buffalo
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights/autocollection"
@@ -45,14 +44,31 @@ func (ctx *context) Response() http.ResponseWriter {
 	return ctx.response
 }
 
-func (ctx *context) Render(code int, rr render.Renderer) error {
+func (ctx *context) Render(status int, rr render.Renderer) error {
 	telem := appinsights.RequestTelemetryFromContext(ctx)
 	if telem != nil {
-		telem.ResponseCode = strconv.Itoa(code)
-		telem.Success = code < 400 || code == 401
+		telem.SetResponseCode(status)
 	}
 
-	return ctx.Context.Render(code, rr)
+	return ctx.Context.Render(status, rr)
+}
+
+func (ctx *context) Error(status int, err error) error {
+	telem := appinsights.RequestTelemetryFromContext(ctx)
+	if telem != nil {
+		telem.SetResponseCode(status)
+	}
+
+	if err != nil {
+		operation := appinsights.OperationFromContext(ctx)
+		if operation != nil {
+			ex := appinsights.NewExceptionTelemetry(err)
+			ex.SeverityLevel = appinsights.Error
+			operation.TrackException(ex)
+		}
+	}
+
+	return ctx.Context.Error(status, err)
 }
 
 func (ctx *context) Value(key interface{}) interface{} {

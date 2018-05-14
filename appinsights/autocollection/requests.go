@@ -3,7 +3,6 @@ package autocollection
 import (
 	"net"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -11,74 +10,98 @@ import (
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights/contracts"
 )
 
+// HTTPMiddleware is a generic middleware that logs incoming requests to
+// Application Insights.
 type HTTPMiddleware struct {
 	client appinsights.TelemetryClient
 }
 
+// NewHTTPMiddleware creates a middleware that uses the specified TelemetryClient.
 func NewHTTPMiddleware(client appinsights.TelemetryClient) *HTTPMiddleware {
 	return &HTTPMiddleware{
 		client: client,
 	}
 }
 
+// HandlerFunc wraps the specified http.HandlerFunc with this middleware.
 func (middleware *HTTPMiddleware) HandlerFunc(handler http.HandlerFunc) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		middleware.ServeHTTP(rw, r, handler)
 	}
 }
 
+// Handler wraps the specified http.Handler with this middleware.
 func (middleware *HTTPMiddleware) Handler(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		middleware.ServeHTTP(rw, r, handler.ServeHTTP)
 	})
 }
 
+// ServeHTTP invokes this middleware's handler, which then calls next.
+// Note: This signature is needed so the middleware object works directly
+// with negroni.
 func (middleware *HTTPMiddleware) ServeHTTP(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
+	newRequest, telem, operation := middleware.BeginRequest(r)
+	for k, v := range middleware.GetCorrelationHeaders(r, operation) {
+		rw.Header().Set(k, v)
+	}
+
+	defer middleware.CompleteRequest(telem, operation)
+	next(newResponseWriter(rw, telem), newRequest)
+}
+
+// BeginRequest creates and returns a telemetry item, an operation, and a wrapped
+// version of the request to pass to successive handlers.
+func (middleware *HTTPMiddleware) BeginRequest(r *http.Request) (*http.Request, *appinsights.RequestTelemetry, appinsights.Operation) {
 	startTime := time.Now()
 	telem := appinsights.NewRequestTelemetry(r.Method, r.URL.String(), 0, "200")
+	telem.Timestamp = startTime
+
 	headers := parseCorrelationRequestHeaders(r)
 	correlation := appinsights.NewCorrelationContext(headers.requestId.GetRoot(), headers.requestId, telem.Name, headers.properties)
-	if string(headers.parentId) == "" {
-		telem.Tags[contracts.OperationParentId] = string(headers.rootId)
+	if headers.parentId.String() == "" {
+		telem.Tags[contracts.OperationParentId] = headers.rootId
 	} else {
-		telem.Tags[contracts.OperationParentId] = string(headers.parentId)
+		telem.Tags[contracts.OperationParentId] = headers.parentId.String()
 	}
-	operation := appinsights.NewOperation(middleware.client, correlation)
 
+	operation := appinsights.NewOperation(middleware.client, correlation)
 	telem.Id = string(headers.requestId)
 	telem.Tags["ai.user.userAgent"] = r.UserAgent()
 	telem.Tags[contracts.LocationIp] = getIP(r)
 	telem.Source = headers.getCorrelatedSource()
+	// TODO: Referer uri
 
 	newRequest := r.WithContext(appinsights.WrapContextRequestTelemetry(appinsights.WrapContextOperation(r.Context(), operation), telem))
-	newWriter := &responseWriter{
-		ResponseWriter: rw,
-		telem:          telem,
-		statusWritten:  false,
-	}
+	return newRequest, telem, operation
+}
 
-	// Write response header
+// GetCorrelationHeaders returns the correlation headers to add to the response
+// for the specified request and operation, if applicable.
+func (middleware *HTTPMiddleware) GetCorrelationHeaders(r *http.Request, operation appinsights.Operation) map[string]string {
+	// TODO: Check blacklist and middleware config...
 	if true { // ???
-		writeCorrelationResponseHeaders(rw, operation)
+		return getCorrelationResponseHeaders(operation)
+	} else {
+		return nil
+	}
+}
+
+// CompleteRequest wraps up the request and submits the telemetry item.  This
+// will track panics if called from a defer.
+func (middleware *HTTPMiddleware) CompleteRequest(telem *appinsights.RequestTelemetry, operation appinsights.Operation) {
+	r := recover()
+	if r != nil {
+		telem.SetResponseCode(500)
+		operation.TrackException(r)
 	}
 
-	defer func() {
-		r := recover()
-		if r != nil {
-			telem.Success = false
-			telem.ResponseCode = "500"
-			operation.TrackException(r)
-		}
+	telem.Duration = time.Since(telem.Timestamp)
+	operation.Track(telem)
 
-		telem.MarkTime(startTime, time.Now())
-		operation.Track(telem)
-
-		if r != nil {
-			panic(r)
-		}
-	}()
-
-	next(newWriter, newRequest)
+	if r != nil {
+		panic(r)
+	}
 }
 
 func getIP(req *http.Request) string {
@@ -120,17 +143,43 @@ func getIP(req *http.Request) string {
 	return ""
 }
 
+// responseWriter wraps an http.ResponseWriter that captures the status code
+// and writes it to a telemetry item.
 type responseWriter struct {
 	http.ResponseWriter
 	telem         *appinsights.RequestTelemetry
 	statusWritten bool
 }
 
+type responseWriterPusher struct {
+	http.ResponseWriter
+	http.Pusher
+}
+
+// newResponseWriter wraps the specified http.ResponseWriter and http.Pusher
+// (if available).
+func newResponseWriter(rw http.ResponseWriter, telem *appinsights.RequestTelemetry) http.ResponseWriter {
+	newWriter := &responseWriter{
+		ResponseWriter: rw,
+		telem:          telem,
+		statusWritten:  false,
+	}
+
+	// If the input ResponseWriter supports push, we must return one that does as well.
+	if pusher, ok := rw.(http.Pusher); ok {
+		return &responseWriterPusher{
+			ResponseWriter: newWriter,
+			Pusher:         pusher,
+		}
+	} else {
+		return newWriter
+	}
+}
+
 func (w *responseWriter) Write(data []byte) (int, error) {
 	if !w.statusWritten {
 		w.statusWritten = true
-		w.telem.ResponseCode = "200"
-		w.telem.Success = true
+		w.telem.SetResponseCode(200)
 	}
 
 	return w.ResponseWriter.Write(data)
@@ -139,8 +188,7 @@ func (w *responseWriter) Write(data []byte) (int, error) {
 func (w *responseWriter) WriteHeader(statusCode int) {
 	if !w.statusWritten {
 		w.statusWritten = true
-		w.telem.ResponseCode = strconv.Itoa(statusCode)
-		w.telem.Success = statusCode < 400 || statusCode == 401
+		w.telem.SetResponseCode(statusCode)
 	}
 
 	w.ResponseWriter.WriteHeader(statusCode)
