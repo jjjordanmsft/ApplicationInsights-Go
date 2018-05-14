@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
-
-	"github.com/satori/go.uuid"
 )
 
 // The longest allowed operation ID
@@ -26,7 +24,7 @@ type OperationId string
 
 // NewOperationId creates a new, random Operation ID.
 func NewOperationId() OperationId {
-	return OperationId("|" + uuid.Must(uuid.NewV4()).String() + ".")
+	return OperationId("|" + newUUID().String() + ".")
 }
 
 // String returns the OperationId as a string

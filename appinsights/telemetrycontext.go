@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights/contracts"
-	"github.com/satori/go.uuid"
 )
 
 // Encapsulates contextual data common to all telemetry submitted through a
@@ -92,9 +91,7 @@ func (context *TelemetryContext) envelop(item Telemetry) *contracts.Envelope {
 	// Create operation ID if it does not exist -- unless it's telemetry that can't
 	// be sampled, since it really doesn't matter in those cases.
 	if _, ok := envelope.Tags[contracts.OperationId]; !ok && item.CanSample() {
-		if oid, err := uuid.NewV4(); err == nil {
-			envelope.Tags[contracts.OperationId] = oid.String()
-		}
+		envelope.Tags[contracts.OperationId] = newUUID().String()
 	}
 
 	// Sanitize.
