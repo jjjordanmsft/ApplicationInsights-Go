@@ -122,6 +122,8 @@ func waitForClose(t *testing.T, ch <-chan struct{}) bool {
 func TestSimpleSubmit(t *testing.T) {
 	mockClock()
 	defer resetClock()
+	mockCidLookup(nil)
+	defer resetCidLookup()
 	client, transmitter := newTestChannelServer()
 	defer transmitter.Close()
 	defer client.Channel().Stop()
@@ -143,6 +145,8 @@ func TestSimpleSubmit(t *testing.T) {
 func TestMultipleSubmit(t *testing.T) {
 	mockClock()
 	defer resetClock()
+	mockCidLookup(nil)
+	defer resetCidLookup()
 	client, transmitter := newTestChannelServer()
 	defer transmitter.Close()
 	defer client.Channel().Stop()
@@ -180,6 +184,8 @@ func TestMultipleSubmit(t *testing.T) {
 func TestFlush(t *testing.T) {
 	mockClock()
 	defer resetClock()
+	mockCidLookup(nil)
+	defer resetCidLookup()
 	client, transmitter := newTestChannelServer()
 	defer transmitter.Close()
 	defer client.Channel().Stop()
@@ -213,6 +219,8 @@ func TestFlush(t *testing.T) {
 func TestStop(t *testing.T) {
 	mockClock()
 	defer resetClock()
+	mockCidLookup(nil)
+	defer resetCidLookup()
 	client, transmitter := newTestChannelServer()
 	defer transmitter.Close()
 
@@ -227,6 +235,8 @@ func TestStop(t *testing.T) {
 func TestCloseFlush(t *testing.T) {
 	mockClock()
 	defer resetClock()
+	mockCidLookup(nil)
+	defer resetCidLookup()
 	client, transmitter := newTestChannelServer()
 	defer transmitter.Close()
 
@@ -244,6 +254,8 @@ func TestCloseFlush(t *testing.T) {
 func TestCloseFlushRetry(t *testing.T) {
 	mockClock()
 	defer resetClock()
+	mockCidLookup(nil)
+	defer resetCidLookup()
 	client, transmitter := newTestChannelServer()
 	defer transmitter.Close()
 
@@ -275,6 +287,8 @@ func TestCloseFlushRetry(t *testing.T) {
 func TestCloseWithOngoingRetry(t *testing.T) {
 	mockClock()
 	defer resetClock()
+	mockCidLookup(nil)
+	defer resetCidLookup()
 	client, transmitter := newTestChannelServer()
 	defer transmitter.Close()
 
@@ -318,6 +332,8 @@ func TestCloseWithOngoingRetry(t *testing.T) {
 func TestSendOnBufferFull(t *testing.T) {
 	mockClock()
 	defer resetClock()
+	mockCidLookup(nil)
+	defer resetCidLookup()
 
 	config := NewTelemetryConfiguration("")
 	config.MaxBatchSize = 4
@@ -356,6 +372,8 @@ func TestSendOnBufferFull(t *testing.T) {
 func TestRetryOnFailure(t *testing.T) {
 	mockClock()
 	defer resetClock()
+	mockCidLookup(nil)
+	defer resetCidLookup()
 	client, transmitter := newTestChannelServer()
 	defer client.Channel().Stop()
 	defer transmitter.Close()
@@ -388,6 +406,8 @@ func TestRetryOnFailure(t *testing.T) {
 func TestPartialRetry(t *testing.T) {
 	mockClock()
 	defer resetClock()
+	mockCidLookup(nil)
+	defer resetCidLookup()
 	client, transmitter := newTestChannelServer()
 	defer client.Channel().Stop()
 	defer transmitter.Close()
@@ -437,6 +457,8 @@ func TestPartialRetry(t *testing.T) {
 func TestThrottleDropsMessages(t *testing.T) {
 	mockClock()
 	defer resetClock()
+	mockCidLookup(nil)
+	defer resetCidLookup()
 	config := NewTelemetryConfiguration("")
 	config.MaxBatchSize = 4
 	client, transmitter := newTestChannelServer(config)
@@ -482,6 +504,8 @@ func TestThrottleDropsMessages(t *testing.T) {
 func TestThrottleCannotFlush(t *testing.T) {
 	mockClock()
 	defer resetClock()
+	mockCidLookup(nil)
+	defer resetCidLookup()
 	config := NewTelemetryConfiguration("")
 	config.MaxBatchSize = 4
 	client, transmitter := newTestChannelServer(config)
@@ -516,6 +540,8 @@ func TestThrottleCannotFlush(t *testing.T) {
 func TestThrottleFlushesOnClose(t *testing.T) {
 	mockClock()
 	defer resetClock()
+	mockCidLookup(nil)
+	defer resetCidLookup()
 	config := NewTelemetryConfiguration("")
 	config.MaxBatchSize = 4
 	client, transmitter := newTestChannelServer(config)
@@ -560,6 +586,8 @@ func TestThrottleFlushesOnClose(t *testing.T) {
 func TestThrottleAbandonsMessageOnStop(t *testing.T) {
 	mockClock()
 	defer resetClock()
+	mockCidLookup(nil)
+	defer resetCidLookup()
 	config := NewTelemetryConfiguration("")
 	config.MaxBatchSize = 4
 	client, transmitter := newTestChannelServer(config)
@@ -589,6 +617,8 @@ func TestThrottleAbandonsMessageOnStop(t *testing.T) {
 func TestThrottleStacking(t *testing.T) {
 	mockClock()
 	defer resetClock()
+	mockCidLookup(nil)
+	defer resetCidLookup()
 	config := NewTelemetryConfiguration("")
 	config.MaxBatchSize = 1
 	client, transmitter := newTestChannelServer(config)

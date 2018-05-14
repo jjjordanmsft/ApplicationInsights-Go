@@ -58,16 +58,15 @@ func TestExceptionTelemetry(t *testing.T) {
 func TestTrackPanic(t *testing.T) {
 	mockClock()
 	defer resetClock()
-	client, transmitter := newTestChannelServer()
-	defer transmitter.Close()
+	mockCidLookup(nil)
+	defer resetCidLookup()
 
+	channel, client := newMockChannelClient(nil)
 	catchTrackPanic(client, "~exception~")
-	client.Channel().Close()
 
-	req := transmitter.waitForRequest(t)
-	if !strings.Contains(req.payload, "~exception~") {
-		t.Error("Unexpected payload")
-	}
+	ex := channel.items[0].Data.(*contracts.Data).BaseData.(*contracts.ExceptionData)
+	exd := ex.Exceptions[0]
+	checkDataContract(t, "ExceptionDetails.Message", exd.Message, "~exception~")
 }
 
 func testExceptionCallstack(t *testing.T, n int) *contracts.ExceptionDetails {
