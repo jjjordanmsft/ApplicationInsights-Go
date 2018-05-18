@@ -18,11 +18,25 @@ func BuffaloAdapter(middleware *autocollection.HTTPMiddleware) buffalo.Middlewar
 		return func(c buffalo.Context) error {
 			var err error
 			middleware.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-				err = next(&context{
+				myctx := &context{
 					Context:  c,
 					request:  r,
 					response: rw,
-				})
+				}
+
+				telem := appinsights.RequestTelemetryFromContext(r.Context())
+
+				err = next(myctx)
+				if err != nil && err == myctx.err && myctx.errTelem != nil {
+					if operation := appinsights.OperationFromContext(r.Context()); operation != nil {
+						operation.Track(myctx.errTelem)
+						telem.SetResponseCode(myctx.errStatus)
+					}
+				}
+
+				if br, ok := c.Response().(*buffalo.Response); ok {
+					telem.SetResponseCode(br.Status)
+				}
 			})(c.Response(), c.Request().WithContext(c) /* needed? */)
 
 			return err
@@ -32,8 +46,11 @@ func BuffaloAdapter(middleware *autocollection.HTTPMiddleware) buffalo.Middlewar
 
 type context struct {
 	buffalo.Context
-	request  *http.Request
-	response http.ResponseWriter
+	request   *http.Request
+	response  http.ResponseWriter
+	errTelem  *appinsights.ExceptionTelemetry
+	errStatus int
+	err       error
 }
 
 func (ctx *context) Request() *http.Request {
@@ -54,21 +71,14 @@ func (ctx *context) Render(status int, rr render.Renderer) error {
 }
 
 func (ctx *context) Error(status int, err error) error {
-	telem := appinsights.RequestTelemetryFromContext(ctx)
-	if telem != nil {
-		telem.SetResponseCode(status)
-	}
-
 	if err != nil {
-		operation := appinsights.OperationFromContext(ctx)
-		if operation != nil {
-			ex := appinsights.NewExceptionTelemetry(err)
-			ex.SeverityLevel = appinsights.Error
-			operation.TrackException(ex)
-		}
+		ctx.errTelem = appinsights.NewExceptionTelemetry(err)
+		ctx.errStatus = status
 	}
 
-	return ctx.Context.Error(status, err)
+	result := ctx.Context.Error(status, err)
+	ctx.err = result
+	return result
 }
 
 func (ctx *context) Value(key interface{}) interface{} {

@@ -23,7 +23,7 @@ type testServer struct {
 }
 
 func newTestServer(telemetryClient appinsights.TelemetryClient) *testServer {
-	httpClient := NewHTTPClient(nil, telemetryClient)
+	httpClient := NewHTTPClient(nil, telemetryClient, nil)
 	result := &testServer{}
 
 	serveMux := http.NewServeMux()
@@ -50,7 +50,7 @@ func newTestServer(telemetryClient appinsights.TelemetryClient) *testServer {
 		result.responseHeaders = append(result.responseHeaders, resp.Header)
 	})
 
-	middleware := NewHTTPMiddleware(telemetryClient)
+	middleware := NewHTTPMiddleware(telemetryClient, nil)
 	result.Server = httptest.NewServer(middleware.Handler(serveMux))
 	return result
 }
