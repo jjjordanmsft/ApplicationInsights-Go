@@ -14,12 +14,41 @@ import (
 // Application Insights.
 type HTTPMiddleware struct {
 	client appinsights.TelemetryClient
+	config *HTTPMiddlewareConfiguration
+}
+
+// HTTPMiddlewareConfiguration specifies flags that modify the behavior of an
+// HTTPMiddleware. For better forward-compatibility, callers should modify the
+// result from NewHTTPMiddlewareConfiguration() rather than instantiate this
+// structure directly.
+type HTTPMiddlewareConfiguration struct {
+	// SendCorrelationHeaders specifies whether the middleware should emit
+	// correlation headers to clients.
+	SendCorrelationHeaders bool
+
+	// LogUserAgent specifies whether to log the user agent. Defaults to
+	// false for data usage savings.
+	LogUserAgent bool
+}
+
+// NewHTTPMiddlewareConfiguration returns a new, default configuration for the
+// HTTP middleware.
+func NewHTTPMiddlewareConfiguration() *HTTPMiddlewareConfiguration {
+	return &HTTPMiddlewareConfiguration{
+		SendCorrelationHeaders: true,
+		LogUserAgent:           false,
+	}
 }
 
 // NewHTTPMiddleware creates a middleware that uses the specified TelemetryClient.
-func NewHTTPMiddleware(client appinsights.TelemetryClient) *HTTPMiddleware {
+func NewHTTPMiddleware(client appinsights.TelemetryClient, config *HTTPMiddlewareConfiguration) *HTTPMiddleware {
+	if config == nil {
+		config = NewHTTPMiddlewareConfiguration()
+	}
+
 	return &HTTPMiddleware{
 		client: client,
+		config: config,
 	}
 }
 
@@ -67,10 +96,13 @@ func (middleware *HTTPMiddleware) BeginRequest(r *http.Request) (*http.Request, 
 
 	operation := appinsights.NewOperation(middleware.client, correlation)
 	telem.Id = string(headers.requestId)
-	telem.Tags["ai.user.userAgent"] = r.UserAgent()
 	telem.Tags[contracts.LocationIp] = getIP(r)
 	telem.Source = headers.getCorrelatedSource()
 	// TODO: Referer uri
+
+	if middleware.config.LogUserAgent {
+		telem.Tags["ai.user.userAgent"] = r.UserAgent()
+	}
 
 	newRequest := r.WithContext(appinsights.WrapContextRequestTelemetry(appinsights.WrapContextOperation(r.Context(), operation), telem))
 	return newRequest, telem, operation
@@ -79,8 +111,7 @@ func (middleware *HTTPMiddleware) BeginRequest(r *http.Request) (*http.Request, 
 // GetCorrelationHeaders returns the correlation headers to add to the response
 // for the specified request and operation, if applicable.
 func (middleware *HTTPMiddleware) GetCorrelationHeaders(r *http.Request, operation appinsights.Operation) map[string]string {
-	// TODO: Check blacklist and middleware config...
-	if true { // ???
+	if middleware.config.SendCorrelationHeaders {
 		return getCorrelationResponseHeaders(operation)
 	} else {
 		return nil

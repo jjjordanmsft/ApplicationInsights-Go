@@ -20,7 +20,7 @@ func main() {
 	}
 
 	telemetryClient.Context().CommonProperties["http_framework"] = "net/http"
-	autocollection.InstrumentDefaultHTTPClient(telemetryClient)
+	autocollection.InstrumentDefaultHTTPClient(telemetryClient, nil)
 	appinsights.NewDiagnosticsMessageListener(func(msg string) error {
 		log.Println(msg)
 		return nil
@@ -28,12 +28,12 @@ func main() {
 
 	// http server setup
 	mux := http.NewServeMux()
-	middleware := autocollection.NewHTTPMiddleware(telemetryClient)
+	middleware := autocollection.NewHTTPMiddleware(telemetryClient, nil)
 
-	mux.Handle("/", http.HandlerFunc(IndexHandler))
-	mux.Handle("/panic", http.HandlerFunc(PanicHandler))
-	mux.Handle("/remote", http.HandlerFunc(RemoteHandler))
-	mux.Handle("/payme", http.HandlerFunc(PaymeHandler))
+	mux.HandleFunc("/", IndexHandler)
+	mux.HandleFunc("/panic", PanicHandler)
+	mux.HandleFunc("/remote", RemoteHandler)
+	mux.HandleFunc("/payme", PaymeHandler)
 
 	http.ListenAndServe("127.0.0.1:3000", middleware.Handler(mux))
 	<-telemetryClient.Channel().Close()

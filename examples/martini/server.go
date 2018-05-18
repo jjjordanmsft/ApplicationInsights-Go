@@ -22,7 +22,7 @@ func main() {
 	}
 
 	telemetryClient.Context().CommonProperties["http_framework"] = "martini"
-	autocollection.InstrumentDefaultHTTPClient(telemetryClient)
+	autocollection.InstrumentDefaultHTTPClient(telemetryClient, nil)
 	appinsights.NewDiagnosticsMessageListener(func(msg string) error {
 		log.Println(msg)
 		return nil
@@ -30,7 +30,7 @@ func main() {
 
 	// http server setup
 	m := martini.Classic()
-	m.Use(aimartini.Middleware(telemetryClient))
+	m.Use(aimartini.MartiniAdapter(autocollection.NewHTTPMiddleware(telemetryClient, nil)))
 	m.Get("/", IndexHandler)
 	m.Get("/panic", PanicHandler)
 	m.Get("/remote", RemoteHandler)

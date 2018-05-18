@@ -59,13 +59,23 @@ func TestClientProperties(t *testing.T) {
 		t.Error("Client.CorrelationId was incorrect")
 	}
 
-	if client.GetSamplingPercentage() != 100.0 {
-		t.Error("Default sampling percentage should be 100")
+	if client.SampleRate() != 100.0 {
+		t.Error("Default sample rate should be 100")
 	}
 
-	client.SetSamplingPercentage(34.0)
-	if client.GetSamplingPercentage() != 34.0 {
-		t.Error("Sampling percentage should be modified by SetSamplingPercentage")
+	client.SetSampleRate(34.0)
+	if client.SampleRate() != 34.0 {
+		t.Error("Sample rate should be modified by SetSampleRate")
+	}
+
+	client.SetSampleRate(111.0)
+	if client.SampleRate() != 34.0 {
+		t.Error("SetSampleRate should not accept values > 100")
+	}
+
+	client.SetSampleRate(-1.0)
+	if client.SampleRate() != 34.0 {
+		t.Error("SetSampleRate should not accept values < 0")
 	}
 }
 
@@ -143,7 +153,7 @@ func TestSampling(t *testing.T) {
 	expected := (pct / 100.0) * float64(count)
 
 	// Send events
-	client.SetSamplingPercentage(pct)
+	client.SetSampleRate(pct)
 	for i := 0; i < count; i++ {
 		client.TrackEvent("Sample test")
 	}

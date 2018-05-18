@@ -80,11 +80,11 @@ func (headers *correlationRequestHeaders) getCorrelatedSource() string {
 // requesets
 func attachCorrelationRequestHeaders(r *http.Request, operation appinsights.Operation) string {
 	correlation := operation.Correlation()
-	id := string(correlation.ParentId.AppendSuffix(nextDependencyNumber(), "."))
+	id := string(correlation.ParentId().AppendSuffix(nextDependencyNumber(), "."))
 	r.Header.Set(requestIdHeader, id)
 	r.Header.Set(rootIdHeader, id)
-	r.Header.Set(parentIdHeader, string(correlation.Id))
-	r.Header.Set(correlationContextHeader, correlation.Properties.Serialize())
+	r.Header.Set(parentIdHeader, correlation.Id().String())
+	r.Header.Set(correlationContextHeader, correlation.Properties().Serialize())
 
 	// Request context header
 	requestContext := r.Header.Get(requestContextHeader)

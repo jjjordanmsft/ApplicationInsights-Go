@@ -1,13 +1,11 @@
 package autocollection
 
 import (
-	"bytes"
 	"net/http"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
+	"github.com/gobwas/glob"
 )
 
 var defaultCorrelationExcludedDomains = []string{
@@ -24,42 +22,75 @@ const (
 	correlationIdPrefix = "cid-v1:" // TODO: Deduplicate
 )
 
+// DependencyTrackingConfiguration specifies flags that modify the behavior of
+// automatic dependency tracking.  For better forward-compatibility, callers
+// should modify the result from NewDependencyTrackingConfiguration() rather
+// than instantiate this structure directly.
+type DependencyTrackingConfiguration struct {
+	// SendCorrelationHeaders specifies whether dependency calls should
+	// ever emit correlation headers to upstream servers.
+	SendCorrelationHeaders bool
+
+	// ExcludeDomains is a list of domains to which we should never send
+	// correlation headers.  Wildcards are supported a la
+	// github.com/gobwas/glob
+	ExcludeDomains []string
+}
+
+// NewDependencyTrackingConfiguration returns a new, default configuration for
+// automatic upstream dependency tracking.
+func NewDependencyTrackingConfiguration() *DependencyTrackingConfiguration {
+	var domains []string
+	domains = append(domains, defaultCorrelationExcludedDomains...)
+
+	return &DependencyTrackingConfiguration{
+		SendCorrelationHeaders: true,
+		ExcludeDomains:         domains,
+	}
+}
+
 // InstrumentDefaultHTTPClient installs a remote dependency tracker in
 // http.DefaultClient.
-func InstrumentDefaultHTTPClient(client appinsights.TelemetryClient) {
-	http.DefaultClient = NewHTTPClient(http.DefaultClient, client)
+func InstrumentDefaultHTTPClient(client appinsights.TelemetryClient, config *DependencyTrackingConfiguration) {
+	http.DefaultClient = NewHTTPClient(http.DefaultClient, client, config)
 }
 
 // NewHTTPClient wraps the input http.Client and tracks remote dependencies to
 // the specified TelemetryClient.
-func NewHTTPClient(httpClient *http.Client, aiClient appinsights.TelemetryClient) *http.Client {
+func NewHTTPClient(httpClient *http.Client, aiClient appinsights.TelemetryClient, config *DependencyTrackingConfiguration) *http.Client {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
 
 	result := *httpClient
-	result.Transport = NewHTTPTransport(httpClient.Transport, aiClient)
+	result.Transport = NewHTTPTransport(httpClient.Transport, aiClient, config)
 	return &result
 }
 
 // NewHTTPTransport wraps the input http.RoundTripper and tracks remote
 // dependencies to the specified TelemetryClient.
-func NewHTTPTransport(transport http.RoundTripper, aiClient appinsights.TelemetryClient) http.RoundTripper {
+func NewHTTPTransport(transport http.RoundTripper, aiClient appinsights.TelemetryClient, config *DependencyTrackingConfiguration) http.RoundTripper {
 	if transport == nil {
 		transport = http.DefaultTransport
 	}
 
+	if config == nil {
+		config = NewDependencyTrackingConfiguration()
+	}
+
 	return &roundtripper{
-		transport:            transport,
-		client:               aiClient,
-		correlationBlacklist: compileBlacklist(aiClient.Config().CorrelationHeaderExcludedDomains),
+		transport: transport,
+		client:    aiClient,
+		config:    config,
+		globs:     compileGlobs(config.ExcludeDomains),
 	}
 }
 
 type roundtripper struct {
-	transport            http.RoundTripper
-	client               appinsights.TelemetryClient
-	correlationBlacklist *regexp.Regexp
+	transport http.RoundTripper
+	client    appinsights.TelemetryClient
+	config    *DependencyTrackingConfiguration
+	globs     []glob.Glob
 }
 
 func (t *roundtripper) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -73,7 +104,7 @@ func (t *roundtripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	var id string
 
 	if operation != nil {
-		if !t.correlationBlacklist.MatchString(r.URL.Host) {
+		if t.config.SendCorrelationHeaders && !matchAny(r.URL.Hostname(), t.globs) {
 			id = attachCorrelationRequestHeaders(r, operation)
 		}
 
@@ -98,50 +129,33 @@ func (t *roundtripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	} else {
 		telem.Success = response.StatusCode < 400
 		telem.ResultCode = response.Status
-	}
 
-	headers := parseCorrelationResponseHeaders(response)
-	if headers.correlationId != "" && headers.correlationId != correlationIdPrefix {
-		telem.Target = headers.getCorrelatedTarget(r.URL)
-		telem.Type = dependencyTypeAI
+		headers := parseCorrelationResponseHeaders(response)
+		if headers.correlationId != "" && headers.correlationId != correlationIdPrefix {
+			telem.Target = headers.getCorrelatedTarget(r.URL)
+			telem.Type = dependencyTypeAI
+		}
 	}
 
 	client.Track(telem)
 	return response, err
 }
 
-func compileBlacklist(excludedDomains []string) *regexp.Regexp {
-	var fullList []string
-	fullList = append(fullList, excludedDomains...)
-	fullList = append(fullList, defaultCorrelationExcludedDomains...)
-
-	var pattern bytes.Buffer
-	pattern.WriteString("(?i)^(")
-	for i, glob := range fullList {
-		if i > 0 {
-			pattern.WriteByte('|')
-		}
-
-		pattern.WriteString(globToPattern(glob))
+func compileGlobs(strs []string) []glob.Glob {
+	var result []glob.Glob
+	for _, s := range strs {
+		result = append(result, glob.MustCompile(s, '.'))
 	}
 
-	pattern.WriteString(")$")
-	return regexp.MustCompile(pattern.String())
+	return result
 }
 
-func globToPattern(glob string) string {
-	var pattern bytes.Buffer
-	for len(glob) > 0 {
-		star := strings.IndexByte(glob, '*')
-		if star < 0 {
-			pattern.WriteString(regexp.QuoteMeta(glob))
-			break
+func matchAny(domain string, globs []glob.Glob) bool {
+	for _, g := range globs {
+		if g.Match(domain) {
+			return true
 		}
-
-		pattern.WriteString(regexp.QuoteMeta(glob[:star]))
-		pattern.WriteString(".*")
-		glob = glob[star+1:]
 	}
 
-	return pattern.String()
+	return false
 }

@@ -4,3 +4,6 @@
 [submodule "vendor/github.com/satori/go.uuid"]
 	path = vendor/github.com/satori/go.uuid
 	url = https://github.com/satori/go.uuid.git
+[submodule "vendor/github.com/gobwas/glob"]
+	path = vendor/github.com/gobwas/glob
+	url = https://github.com/gobwas/glob

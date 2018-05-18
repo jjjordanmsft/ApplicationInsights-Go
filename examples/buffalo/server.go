@@ -24,7 +24,7 @@ func init() {
 	}
 
 	telemetryClient.Context().CommonProperties["http_framework"] = "buffalo"
-	autocollection.InstrumentDefaultHTTPClient(telemetryClient)
+	autocollection.InstrumentDefaultHTTPClient(telemetryClient, nil)
 	appinsights.NewDiagnosticsMessageListener(func(msg string) error {
 		log.Println(msg)
 		return nil
@@ -43,7 +43,7 @@ func main() {
 
 func App() *buffalo.App {
 	app := buffalo.New(buffalo.Options{})
-	app.Use(aibuffalo.Middleware(telemetryClient))
+	app.Use(aibuffalo.BuffaloAdapter(autocollection.NewHTTPMiddleware(telemetryClient, nil)))
 
 	app.GET("/", IndexHandler)
 	app.GET("/panic", PanicHandler)

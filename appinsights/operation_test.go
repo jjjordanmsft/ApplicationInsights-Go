@@ -9,46 +9,46 @@ import (
 func TestNewCorrelationContext(t *testing.T) {
 	// Test that a new operation ID is generated + the empty case.
 	cc1 := NewCorrelationContext(OperationId(""), OperationId(""), "", nil)
-	if cc1.Name != "" {
+	if cc1.Name() != "" {
 		t.Error("Name wasn't as expected")
 	}
-	if match, _ := regexp.MatchString("^"+newIdPattern+"$", cc1.Id.String()); !match {
+	if match, _ := regexp.MatchString("^"+newIdPattern+"$", cc1.Id().String()); !match {
 		t.Error("Expected a new OperationID in Id")
 	}
-	if cc1.Id != cc1.ParentId {
+	if cc1.Id() != cc1.ParentId() {
 		t.Error("Expected ParentId == Id")
 	}
-	if cc1.Properties == nil || len(cc1.Properties) != 0 {
+	if cc1.Properties() == nil || len(cc1.Properties()) != 0 {
 		t.Error("Expected a new, empty CorrelationProperties map")
 	}
 
 	// Test that the parent ID gets assigned to Operation ID if not provided
 	cc2 := NewCorrelationContext(OperationId("rootOperation"), OperationId(""), "-name-", CorrelationProperties{})
-	if cc2.Name != "-name-" {
+	if cc2.Name() != "-name-" {
 		t.Error("Name wasn't as expected")
 	}
-	if cc2.Id.String() != "rootOperation" {
+	if cc2.Id().String() != "rootOperation" {
 		t.Error("Id wasn't as expected")
 	}
-	if cc2.ParentId.String() != "rootOperation" {
+	if cc2.ParentId().String() != "rootOperation" {
 		t.Error("ParentId didn't match Id")
 	}
-	if cc2.Properties == nil || len(cc2.Properties) != 0 {
+	if cc2.Properties() == nil || len(cc2.Properties()) != 0 {
 		t.Error("Expected an empty correlation properties map")
 	}
 
 	// Test the regular case
 	cc3 := NewCorrelationContext(OperationId("rootOperation"), OperationId("|rootOperation.foo_"), "-name-", CorrelationProperties{"foo": "bar"})
-	if cc3.Name != "-name-" {
+	if cc3.Name() != "-name-" {
 		t.Error("Name wasn't as expected")
 	}
-	if cc3.Id.String() != "rootOperation" {
+	if cc3.Id().String() != "rootOperation" {
 		t.Error("Id wasn't as expected")
 	}
-	if cc3.ParentId.String() != "|rootOperation.foo_" {
+	if cc3.ParentId().String() != "|rootOperation.foo_" {
 		t.Error("ParentId wasn't as expected")
 	}
-	if v, ok := cc3.Properties["foo"]; !ok || v != "bar" {
+	if v, ok := cc3.Properties()["foo"]; !ok || v != "bar" {
 		t.Error("Properties wasn't propagated as expected")
 	}
 }
@@ -103,7 +103,7 @@ func TestOperationProperties(t *testing.T) {
 	properties := ParseCorrelationProperties("a=b,c=d")
 	correlation := NewCorrelationContext(OperationId("a"), OperationId("b"), "c", properties)
 	channel, client := newMockChannelClient(nil)
-	client.SetSamplingPercentage(99.0)
+	client.SetSampleRate(99.0)
 	client.SetIsEnabled(false)
 	operation := NewOperation(client, correlation)
 
@@ -116,7 +116,7 @@ func TestOperationProperties(t *testing.T) {
 		t.Error("IsEnabled not propagated")
 	}
 
-	if operation.GetSamplingPercentage() != 99.0 {
+	if operation.SampleRate() != 99.0 {
 		t.Error("Sampling percentage not propagated")
 	}
 

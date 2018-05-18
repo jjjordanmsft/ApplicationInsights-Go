@@ -21,14 +21,14 @@ func main() {
 	}
 
 	telemetryClient.Context().CommonProperties["http_framework"] = "goji"
-	autocollection.InstrumentDefaultHTTPClient(telemetryClient)
+	autocollection.InstrumentDefaultHTTPClient(telemetryClient, nil)
 	appinsights.NewDiagnosticsMessageListener(func(msg string) error {
 		log.Println(msg)
 		return nil
 	})
 
 	// Inject middleware
-	middleware := autocollection.NewHTTPMiddleware(telemetryClient)
+	middleware := autocollection.NewHTTPMiddleware(telemetryClient, nil)
 	goji.Use(middleware.Handler)
 
 	goji.Get("/", IndexHandler)

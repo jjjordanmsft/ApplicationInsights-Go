@@ -22,7 +22,7 @@ func main() {
 	}
 
 	telemetryClient.Context().CommonProperties["http_framework"] = "gin"
-	autocollection.InstrumentDefaultHTTPClient(telemetryClient)
+	autocollection.InstrumentDefaultHTTPClient(telemetryClient, nil)
 	appinsights.NewDiagnosticsMessageListener(func(msg string) error {
 		log.Println(msg)
 		return nil
@@ -30,7 +30,7 @@ func main() {
 
 	// Gin setup
 	router := gin.Default()
-	router.Use(aigin.Middleware(telemetryClient))
+	router.Use(aigin.GinAdapter(autocollection.NewHTTPMiddleware(telemetryClient, nil)))
 
 	router.GET("/", IndexHandler)
 	router.GET("/panic", PanicHandler)

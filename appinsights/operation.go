@@ -14,29 +14,37 @@ type Operation interface {
 	TelemetryClient
 
 	// Correlation returns the CorrelationContext for this operation.
-	Correlation() *CorrelationContext
+	Correlation() CorrelationContext
 }
 
 type operation struct {
 	telemetryClient
-	correlationContext *CorrelationContext
+	correlationContext CorrelationContext
 	originalClient     TelemetryClient
 }
 
 // CorrelationContext contains the IDs and other related information for a
 // logical operation to be correlated across services.
-type CorrelationContext struct {
-	// Name is the operation name
-	Name string
+type CorrelationContext interface {
+	// Name returns the operation name
+	Name() string
 
-	// Id is the operation ID
-	Id OperationId
+	// Id returns the operation ID
+	Id() OperationId
 
-	// ParentId is the operation's parent ID (such as request ID).
-	ParentId OperationId
+	// ParentId returns the operation's parent ID (such as request ID).
+	ParentId() OperationId
 
-	// Properties is a map of user-defined custom properties
-	Properties CorrelationProperties
+	// Properties returns a map of user-defined custom properties. This
+	// may be modified by the caller.
+	Properties() CorrelationProperties
+}
+
+type correlationContext struct {
+	name       string
+	id         OperationId
+	parentId   OperationId
+	properties CorrelationProperties
 }
 
 // CorrelationProperties is a serializable map of custom properties used when
@@ -45,7 +53,7 @@ type CorrelationProperties map[string]string
 
 // NewOperation creates an Operation instance with the specified correlation
 // information.
-func NewOperation(client TelemetryClient, correlation *CorrelationContext) Operation {
+func NewOperation(client TelemetryClient, correlation CorrelationContext) Operation {
 	context := NewTelemetryContext(client.InstrumentationKey())
 	context.CommonProperties = client.Context().CommonProperties
 
@@ -53,25 +61,25 @@ func NewOperation(client TelemetryClient, correlation *CorrelationContext) Opera
 		context.Tags[k] = v
 	}
 
-	context.Tags[contracts.OperationParentId] = correlation.ParentId.String()
-	context.Tags[contracts.OperationId] = correlation.Id.String()
-	context.Tags[contracts.OperationName] = correlation.Name
+	context.Tags[contracts.OperationParentId] = correlation.ParentId().String()
+	context.Tags[contracts.OperationId] = correlation.Id().String()
+	context.Tags[contracts.OperationName] = correlation.Name()
 
 	return &operation{
 		correlationContext: correlation,
 		originalClient:     client,
 		telemetryClient: telemetryClient{
-			channel:   client.Channel(),
-			context:   context,
-			config:    client.Config(),
-			isEnabled: client.IsEnabled(),
-			sampling:  client.GetSamplingPercentage(),
+			channel:    client.Channel(),
+			context:    context,
+			config:     client.Config(),
+			isEnabled:  client.IsEnabled(),
+			sampleRate: client.SampleRate(),
 		},
 	}
 }
 
 // Correlation returns the correlation context for this operation.
-func (op *operation) Correlation() *CorrelationContext {
+func (op *operation) Correlation() CorrelationContext {
 	return op.correlationContext
 }
 
@@ -84,7 +92,7 @@ func (op *operation) CorrelationId() string {
 
 // NewCorrelationContext creates a CorrelationContext with the specified IDs
 // and properties.
-func NewCorrelationContext(operationId, parentId OperationId, name string, properties CorrelationProperties) *CorrelationContext {
+func NewCorrelationContext(operationId, parentId OperationId, name string, properties CorrelationProperties) CorrelationContext {
 	if string(operationId) == "" {
 		operationId = NewOperationId()
 	}
@@ -97,12 +105,28 @@ func NewCorrelationContext(operationId, parentId OperationId, name string, prope
 		properties = make(CorrelationProperties)
 	}
 
-	return &CorrelationContext{
-		Name:       name,
-		Id:         operationId,
-		ParentId:   parentId,
-		Properties: properties,
+	return &correlationContext{
+		name:       name,
+		id:         operationId,
+		parentId:   parentId,
+		properties: properties,
 	}
+}
+
+func (context *correlationContext) Name() string {
+	return context.name
+}
+
+func (context *correlationContext) Id() OperationId {
+	return context.id
+}
+
+func (context *correlationContext) ParentId() OperationId {
+	return context.parentId
+}
+
+func (context *correlationContext) Properties() CorrelationProperties {
+	return context.properties
 }
 
 // ParseCorrelationProperties deserializes the custom property bag from the

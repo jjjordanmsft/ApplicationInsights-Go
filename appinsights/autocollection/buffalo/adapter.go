@@ -9,11 +9,11 @@ import (
 	"github.com/gobuffalo/buffalo/render"
 )
 
-// Middleware is an adapter so that the AI middleware's HandlerFunc can be used in buffalo.
+// BuffaloAdapter is an adapter to make Application Insights' autocollection.HTTPMiddleware
+// work natively within buffalo.
 // This should be added via:
-//   app.Use(Middleware(telemetryClient))
-func Middleware(telemetryClient appinsights.TelemetryClient) buffalo.MiddlewareFunc {
-	middleware := autocollection.NewHTTPMiddleware(telemetryClient)
+//   app.Use(BuffaloAdapter(autocollection.NewHTTPMiddleware(telemetryClient, config)))
+func BuffaloAdapter(middleware *autocollection.HTTPMiddleware) buffalo.MiddlewareFunc {
 	return func(next buffalo.Handler) buffalo.Handler {
 		return func(c buffalo.Context) error {
 			var err error

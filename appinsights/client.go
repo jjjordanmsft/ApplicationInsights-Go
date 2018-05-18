@@ -37,12 +37,11 @@ type TelemetryClient interface {
 	// is silently swallowed by the client. Defaults to enabled.
 	SetIsEnabled(enabled bool)
 
-	// GetSamplingPercentage gets the current sampling percentage for the
-	// client.
-	GetSamplingPercentage() float64
+	// SampleRate returns the current sampling rate (0-100) for the client.
+	SampleRate() float64
 
-	// SetSamplingPercentage sets the sampling percentage for the client.
-	SetSamplingPercentage(samplingPercentage float64)
+	// SetSampleRate sets the sampling rate (0-100) for the client.
+	SetSampleRate(sampleRate float64)
 
 	// Submits the specified telemetry item.
 	Track(telemetry Telemetry)
@@ -76,12 +75,12 @@ type TelemetryClient interface {
 }
 
 type telemetryClient struct {
-	channel   TelemetryChannel
-	context   *TelemetryContext
-	config    *TelemetryConfiguration
-	cid       string
-	sampling  float64
-	isEnabled bool
+	channel    TelemetryChannel
+	context    *TelemetryContext
+	config     *TelemetryConfiguration
+	cid        string
+	sampleRate float64
+	isEnabled  bool
 }
 
 // Creates a new telemetry client instance that submits telemetry with the
@@ -94,11 +93,11 @@ func NewTelemetryClient(iKey string) TelemetryClient {
 // TelemetryConfiguration object.
 func NewTelemetryClientFromConfig(config *TelemetryConfiguration) TelemetryClient {
 	client := &telemetryClient{
-		channel:   NewInMemoryChannel(config),
-		context:   config.setupContext(),
-		config:    config,
-		isEnabled: true,
-		sampling:  100.0,
+		channel:    NewInMemoryChannel(config),
+		context:    config.setupContext(),
+		config:     config,
+		isEnabled:  true,
+		sampleRate: 100.0,
 	}
 
 	client.cid = correlationIdPrefix
@@ -150,14 +149,16 @@ func (tc *telemetryClient) SetIsEnabled(isEnabled bool) {
 	tc.isEnabled = isEnabled
 }
 
-// GetSamplingPercentage gets the current sampling percentage for the client.
-func (tc *telemetryClient) GetSamplingPercentage() float64 {
-	return tc.sampling
+// SampleRate returns the current sampling rate (0-100) for the client.
+func (tc *telemetryClient) SampleRate() float64 {
+	return tc.sampleRate
 }
 
-// SetSamplingPercentage sets the sampling percentage for the client.
-func (tc *telemetryClient) SetSamplingPercentage(samplingPercentage float64) {
-	tc.sampling = samplingPercentage
+// SetSampleRate sets the sampling rate (0-100) for the client.
+func (tc *telemetryClient) SetSampleRate(sampleRate float64) {
+	if sampleRate >= 0.0 && sampleRate <= 100.0 {
+		tc.sampleRate = sampleRate
+	}
 }
 
 // Submits the specified telemetry item.
@@ -165,8 +166,8 @@ func (tc *telemetryClient) Track(item Telemetry) {
 	if tc.isEnabled && item != nil {
 		envelope := tc.context.envelop(item)
 		oid := envelope.Tags[contracts.OperationId]
-		if !item.CanSample() || tc.sampling >= 100.0 || OperationId(oid).Hash() < tc.sampling {
-			envelope.SampleRate = tc.sampling
+		if !item.CanSample() || tc.sampleRate >= 100.0 || OperationId(oid).Hash() < tc.sampleRate {
+			envelope.SampleRate = tc.sampleRate
 			tc.channel.Send(envelope)
 		}
 	}

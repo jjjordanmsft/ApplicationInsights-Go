@@ -1,13 +1,13 @@
 package gin
 
 import (
-	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights/autocollection"
 	"github.com/gin-gonic/gin"
 )
 
-func Middleware(telemetryClient appinsights.TelemetryClient) gin.HandlerFunc {
-	middleware := autocollection.NewHTTPMiddleware(telemetryClient)
+// GinAdapter is an adapter to make Application Insights' autocollection.HTTPMiddleware
+// work natively within gin.
+func GinAdapter(middleware *autocollection.HTTPMiddleware) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		request, telem, operation := middleware.BeginRequest(c.Request)
 		for k, v := range middleware.GetCorrelationHeaders(c.Request, operation) {

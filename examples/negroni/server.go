@@ -21,7 +21,7 @@ func main() {
 	}
 
 	telemetryClient.Context().CommonProperties["http_framework"] = "negroni"
-	autocollection.InstrumentDefaultHTTPClient(telemetryClient)
+	autocollection.InstrumentDefaultHTTPClient(telemetryClient, nil)
 	appinsights.NewDiagnosticsMessageListener(func(msg string) error {
 		log.Println(msg)
 		return nil
@@ -36,7 +36,7 @@ func main() {
 	mux.Handle("/payme", http.HandlerFunc(PaymeHandler))
 
 	n := negroni.Classic()
-	n.Use(autocollection.NewHTTPMiddleware(telemetryClient))
+	n.Use(autocollection.NewHTTPMiddleware(telemetryClient, nil))
 	n.UseHandler(mux)
 	n.Run("127.0.0.1:3000")
 
