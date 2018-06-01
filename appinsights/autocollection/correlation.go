@@ -77,7 +77,7 @@ func (headers *correlationRequestHeaders) getCorrelatedSource() string {
 }
 
 // attachCorrelationRequestHeaders adds correlation headers to outgoing
-// requesets
+// requests
 func attachCorrelationRequestHeaders(r *http.Request, operation appinsights.Operation) string {
 	correlation := operation.Correlation()
 	id := string(correlation.ParentId().AppendSuffix(nextDependencyNumber(), "."))
@@ -85,19 +85,24 @@ func attachCorrelationRequestHeaders(r *http.Request, operation appinsights.Oper
 	r.Header.Set(rootIdHeader, id)
 	r.Header.Set(parentIdHeader, correlation.Id().String())
 	r.Header.Set(correlationContextHeader, correlation.Properties().Serialize())
-
-	// Request context header
-	requestContext := r.Header.Get(requestContextHeader)
-	props := appinsights.ParseCorrelationProperties(requestContext)
-	if correlationId := operation.CorrelationId(); props[requestContextSourceKey] == "" && correlationId != "" {
-		props[requestContextSourceKey] = correlationId
-	}
-	if cloudRole := operation.Context().Tags[contracts.CloudRole]; props[requestContextSourceRoleNameKey] == "" && cloudRole != "" {
-		props[requestContextSourceRoleNameKey] = cloudRole
-	}
-	r.Header.Set(requestContextHeader, props.Serialize())
+	attachRequestContextHeader(r, operation)
 
 	return id
+}
+
+// attachRequestContextHeader adds the request-context header to outgoing
+// requests.
+func attachRequestContextHeader(r *http.Request, client appinsights.TelemetryClient) {
+	requestContext := r.Header.Get(requestContextHeader)
+	props := appinsights.ParseCorrelationProperties(requestContext)
+	if correlationId := client.CorrelationId(); props[requestContextSourceKey] == "" && correlationId != "" {
+		props[requestContextSourceKey] = correlationId
+	}
+	if cloudRole := client.Context().Tags[contracts.CloudRole]; props[requestContextSourceRoleNameKey] == "" && cloudRole != "" {
+		props[requestContextSourceRoleNameKey] = cloudRole
+	}
+
+	r.Header.Set(requestContextHeader, props.Serialize())
 }
 
 // parseCorrelationResponseHeaders parses correlation data from dependency

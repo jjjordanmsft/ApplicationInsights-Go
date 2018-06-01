@@ -2,6 +2,7 @@ package autocollection
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/Microsoft/ApplicationInsights-Go/appinsights"
@@ -103,11 +104,15 @@ func (t *roundtripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	client := t.client
 	var id string
 
-	if operation != nil {
-		if t.config.SendCorrelationHeaders && !matchAny(r.URL.Hostname(), t.globs) {
+	if t.config.SendCorrelationHeaders && !matchAny(r.URL.Hostname(), t.globs) {
+		if operation != nil {
 			id = attachCorrelationRequestHeaders(r, operation)
+		} else {
+			attachRequestContextHeader(r, client)
 		}
+	}
 
+	if operation != nil {
 		client = operation
 	}
 
@@ -128,7 +133,7 @@ func (t *roundtripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		// TODO: Err into data?
 	} else {
 		telem.Success = response.StatusCode < 400
-		telem.ResultCode = response.Status
+		telem.ResultCode = strconv.Itoa(response.StatusCode)
 
 		headers := parseCorrelationResponseHeaders(response)
 		if headers.correlationId != "" && headers.correlationId != correlationIdPrefix {

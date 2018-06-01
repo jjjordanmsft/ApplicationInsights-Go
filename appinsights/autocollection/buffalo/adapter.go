@@ -32,9 +32,7 @@ func BuffaloAdapter(middleware *autocollection.HTTPMiddleware) buffalo.Middlewar
 						operation.Track(myctx.errTelem)
 						telem.SetResponseCode(myctx.errStatus)
 					}
-				}
-
-				if br, ok := c.Response().(*buffalo.Response); ok {
+				} else if br, ok := c.Response().(*buffalo.Response); ok {
 					telem.SetResponseCode(br.Status)
 				}
 			})(c.Response(), c.Request().WithContext(c) /* needed? */)
