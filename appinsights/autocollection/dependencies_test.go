@@ -2,9 +2,7 @@ package autocollection
 
 import (
 	"errors"
-	"math"
 	"net/http"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -174,7 +172,6 @@ func TestDependencyToStandard(t *testing.T) {
 	if !strings.HasPrefix(dep.Id, tags["ai.operation.parentId"]) {
 		t.Error("Expected dependency ID to start with request parent id")
 	}
-
 }
 
 func TestDependencyFailedRequest(t *testing.T) {
@@ -334,46 +331,4 @@ func newFakeOperation(client appinsights.TelemetryClient, rootId string) appinsi
 	oid := appinsights.OperationId(rootId)
 	cc := appinsights.NewCorrelationContext(oid, oid.GenerateRequestId(), "GET /", nil)
 	return appinsights.NewOperation(client, cc)
-}
-
-const float_precision = 1e-4
-
-func checkDataContract(t *testing.T, property string, actual, expected interface{}) {
-	if x, ok := actual.(float64); ok {
-		if y, ok := expected.(float64); ok {
-			if math.Abs(x-y) > float_precision {
-				t.Errorf("Float property %s mismatched; got %f, want %f.\n", property, actual, expected)
-			}
-
-			return
-		}
-	}
-
-	if x, ok := actual.(string); ok {
-		if y, ok := expected.(string); ok {
-			if x != y {
-				t.Errorf("Property %s mismatched; got %s, want %s.\n", property, x, y)
-			}
-
-			return
-		}
-	}
-
-	if actual != expected {
-		t.Errorf("Property %s mismatched; got %v, want %v.\n", property, actual, expected)
-	}
-}
-
-func checkPattern(t *testing.T, property, actual, expected string) {
-	if m, err := regexp.MatchString(expected, actual); !m || err != nil {
-		t.Errorf("Property %s mismatched; got %s, want %s.\n", property, actual, expected)
-	}
-}
-
-func checkHeader(t *testing.T, header http.Header, key string, expected interface{}) {
-	checkDataContract(t, "Header["+key+"]", header.Get(key), expected)
-}
-
-func checkHeaderPattern(t *testing.T, header http.Header, key, expected string) {
-	checkPattern(t, "Header["+key+"]", header.Get(key), expected)
 }

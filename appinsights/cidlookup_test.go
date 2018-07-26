@@ -103,7 +103,7 @@ func TestCidRetryOn500(t *testing.T) {
 	if result == nil {
 		t.Error("Expected response after retry")
 	} else if result.err != nil || result.correlationId != "cid-v1:test_cid" {
-		t.Error("Unexpected result: %s, %s", result.err, result.correlationId)
+		t.Errorf("Unexpected result: %s, %s", result.err.Error(), result.correlationId)
 	}
 }
 

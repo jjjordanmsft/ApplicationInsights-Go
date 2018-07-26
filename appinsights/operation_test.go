@@ -154,7 +154,7 @@ func TestParseCorrelationProperties(t *testing.T) {
 	for _, testCase := range testCases {
 		result := ParseCorrelationProperties(testCase.str)
 		if result == nil {
-			t.Error("ParseCorrelationProperties returned nil for input: %s", testCase.str)
+			t.Errorf("ParseCorrelationProperties returned nil for input: %s", testCase.str)
 			continue
 		}
 
